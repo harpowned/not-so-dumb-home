@@ -2,15 +2,22 @@
 import modbusdriver_pymodbus as modbusdriver
 import logging
 
-logger = logging.getLogger("smarthome")
+logger = logging.getLogger("smarthome.rdf302")
 
-rdf302_address = 2
+rdf302_address = 1
+
+def setModbusAddr(address):
+	global rdf302_address
+	logger.debug("Setting RDF302 modbus address to %s" % address)
+	rdf302_address = int(address)
 
 def rdf302_read_temp(data_address):
 	result = round(int(modbusdriver.modbus_read_input(rdf302_address,data_address))/float(50),2)
 	return result
 
 def rdf302_write_int(data_address,value):
+	logger.debug("Writing int to rdf302. Data_address: %s Value: %s" % (data_address,value))
+	logger.debug("RDF302 modbus address to %s" % rdf302_address)
 	modbusdriver.modbus_write_holding(rdf302_address,data_address,value)
 
 def rdf302_write_temp(data_address,value):

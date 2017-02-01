@@ -9,6 +9,10 @@ sdm220_address = 1 ## Modbus address of device
 def sdm220_request(data_address):
 	return modbusdriver.modbus_read_float(sdm220_address,data_address)
 
+def setModbusAddr(address):
+	global sdm220_address
+	sdm220_address = int(address)
+
 def getVoltage():
 	# 30001 - Voltage - Spannung - Volts
 	voltage = sdm220_request(0)

@@ -13,6 +13,9 @@ CMD_GETTEMP="ts_getsetpoint"
 
 #logger = logging.getlogger("programmer")
 
+def start():
+	print "TCP sender initialized"
+
 def send_command(command):
 	# Create a TCP/IP socket
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -3,26 +3,45 @@ import mysql.connector
 import time
 from apscheduler.schedulers.blocking import BlockingScheduler
 import datetime
-import thermo_control
 import threading
 import logging
 from logging.handlers import RotatingFileHandler
 import traceback
 import os
 import mail_sender
+import ConfigParser
+import sys
+import getopt
 
-VERSION="1.0"
+VERSION="1.1"
 
-logpath="/var/log/smarthome/programmer.log"
+Config = ConfigParser.ConfigParser()
+def_config_paths = [
+	"/etc/smarthome/heatingScheduler.cfg",
+	"/usr/local/etc/smarthome/heatingScheduler.cfg",
+	"./heatingScheduler.cfg",
+]
+supported_dbs = [
+	"mysql",
+]
+supported_email = [
+	"smtp",
+	"off",
+]
+supported_device_comm = [
+	"tcp",
+]
+
+logpath=""
 
 
 global logger
 logger = logging.getLogger("programmer")
 
-DB_user='smarthome'
-DB_password='aaaaaaaa'
-DB_host='127.0.0.1'
-DB_database='smarthome'
+DB_user=''
+DB_password=''
+DB_host=''
+DB_database=''
 
 global sched
 
@@ -37,7 +56,7 @@ def die():
 
 def init_log(path):
         global logger
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
 
         # add a rotating handler
         file_handler = RotatingFileHandler(path, maxBytes=10*1024*1024,backupCount=5)
@@ -224,8 +243,72 @@ def update_schedule():
 			sched.add_job(setTemp,'date', run_date=job_time, args=[job_temp])
 	cnx.close()
 
+def print_usage():
+	print 'Usage: programmer.py [-c <configfile>, -v]'
+	print '	-c <configfile> : Read config file from nonstandard location'
+	print '	-v : Enable verbose output'
+	print ' If no config file is specified using -c, config file is loaded from the first existing location in the following:'
+	for config_path in reversed(def_config_paths):
+		print "    %s "%config_path
+	
+	sys.exit(2)
 
 ## Main function
+
+config_file = ""
+
+## Parse command line arguments
+try:
+	opts,args = getopt.getopt(sys.argv[1:],"c:v",["--config=","--verbose"])
+except getopt.GetoptError:
+	print_usage()
+for opt, arg in opts:
+	if opt == '-h':
+		print_usage()
+	elif opt in ("-c","--config"):
+		config_file = arg
+	elif opt in ("-v","--verbose"):
+		logger.setLevel(logging.DEBUG)
+
+if not config_file:
+	for config_candidate in def_config_paths:
+		if os.path.exists(config_candidate):
+			config_file = config_candidate
+
+if not os.path.exists(config_file):
+	print "Error: Config file not found"
+	sys.exit(2)
+
+
+print "Reading config file from: %s" % config_file
+Config.read(config_file)
+
+logpath = Config.get("heatingScheduler","logfile")
+if not logpath:
+	print "Error: missing logpath. Check config file"
+	sys.exit(2)
+
+db_type = Config.get("heatingScheduler","database")
+if db_type not in supported_dbs:
+	print "Error: unsupported database type. Check config file"
+	sys.exit(2)
+
+## Only mysql is supported right now
+DB_user=Config.get("database-mysql","host")
+DB_password=Config.get("database-mysql","user")
+DB_host=Config.get("database-mysql","pass")
+DB_database=Config.get("database-mysql","database")
+
+device_comm = Config.get("heatingScheduler","device-comm")
+if device_comm not in supported_device_comm:
+	print "Error: unsupported device comm type. Check config file"
+	sys.exit(2)
+
+if device_comm == "tcp":
+	import thermo_control_tcp as thermo_control
+thermo_control.start()
+	
+
 init_log(logpath)
 logger.info("Starting SmartHome Programmer %s" % VERSION)
 sched = BlockingScheduler()
