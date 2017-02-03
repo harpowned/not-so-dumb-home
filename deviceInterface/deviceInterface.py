@@ -13,7 +13,7 @@ import getopt
 import paho.mqtt.client as mqtt
 import json
 
-VERSION="1.6"
+VERSION="1.6.1"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -171,9 +171,15 @@ def on_message(mqttClient, userdata, msg):
 					powermeter_data.append(key)
 			for datatype,function in zip(powermeter_datatypes_get,powermeter_datafunctions_get):
 				if datatype in powermeter_data:
+					if "values" not in response:
+						response["values"] = {}
 					methodToCall = getattr(powermeter, function)
-					response[datatype] = str(methodToCall())
+					response["values"][datatype] = str(methodToCall())
 			if response:
+				if "query_id" in jsonMsg:
+					response["query_id"] = jsonMsg["query_id"]
+				response["device"] = "powermeter"
+				response["command"] = "readings"
 				mqttClient.publish(mqtt_topic,json.dumps(response))
 		## Process thermostat GET commands
 		elif device == "thermostat" and command == "get":
@@ -184,9 +190,15 @@ def on_message(mqttClient, userdata, msg):
 					thermostat_data.append(key)
 			for datatype,function in zip(thermostat_datatypes_get,thermostat_datafunctions_get):
 				if datatype in thermostat_data:
+					if "values" not in response:
+						response["values"] = {}
 					methodToCall = getattr(thermostat, function)
-					response[datatype] = str(methodToCall())
+					response["values"][datatype] = str(methodToCall())
 			if response:
+				response["device"] = "thermostat"
+				response["command"] = "readings"
+				if "query_id" in jsonMsg:
+					response["query_id"] = jsonMsg["query_id"]
 				mqttClient.publish(mqtt_topic,json.dumps(response))
 		## Process thermostat SET commands
 		elif device == "thermostat" and command == "set":
@@ -194,6 +206,7 @@ def on_message(mqttClient, userdata, msg):
 			key = jsonMsg["key"]
 			value = jsonMsg["value"]
 			# Asking for a nonexisting index will raise an exception, so we don't need to treat the case here
+			logger.info("Thermostat SET command, Key: %s, value: %s" % (key,value))
 			keyIndex = thermostat_datatypes_set.index(key)
 			methodToCall = getattr(thermostat,thermostat_datafunctions_set[keyIndex])
 			methodToCall(value)
