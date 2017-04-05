@@ -13,7 +13,7 @@ import getopt
 import paho.mqtt.client as mqtt
 import json
 
-VERSION="1.6.1"
+VERSION="1.6.2"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -133,11 +133,15 @@ thermostat_datatypes_get = [
 	"curtemp",
 	"setpoint",
 	"isheating",
+	"solar",
+	"mode",
 ]
 thermostat_datafunctions_get = [
 	"getCurrentTemp",
 	"getCurrentSetpoint",
-	"isHeatingInt"
+	"isHeatingInt",
+	"isSolarInt",
+	"getCurrentMode",
 ]
 thermostat_datatypes_set = [
 	"setpoint",
@@ -216,6 +220,8 @@ def on_message(mqttClient, userdata, msg):
 		logger.warning("Received invalid json (invalid key)")
 	except TypeError:
 		logger.warning("Received invalid json (invalid type)")
+	except RuntimeError:
+		logger.warning("No response to a query")
 	except:
 		die()
 	
@@ -295,6 +301,17 @@ def main(args):
 	elif thermoType == "rdf302":
 		import rdf302driver as thermostat
 		thermostat.setModbusAddr(Config.get("thermostat-rdf302","modbus-address"))
+	elif thermoType == "arduinoSolarThermo":
+		import arduinoSolarThermoDriver as thermostat
+		thermostat.setSerialAddr(Config.get("thermostat-arduinoSolarThermo","serial-address"))
+		thermostat.openSerial()
+		logger.info("Sleeping to allow thermostat to boot..")
+		time.sleep(5)
+		solarSchedulerOn = Config.get("thermostat-arduinoSolarThermo","solarScheduler")
+		if solarSchedulerOn == "yes":
+			solarTimeOn = int(Config.get("thermostat-arduinoSolarThermo","solarTimeOn"))
+			solarTimeOff = int(Config.get("thermostat-arduinoSolarThermo","solarTimeOff"))
+			thermostat.startSolarScheduler(solarTimeOn,solarTimeOff)
 	else:
 		logger.error("Unsupported thermostat type. Check config file")
 		sys.exit(2)

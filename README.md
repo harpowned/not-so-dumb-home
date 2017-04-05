@@ -39,6 +39,12 @@ Power Meter: Eastron SDM220
   - Uses Modbus RTU, and the manual has the full documentation on how to remotely operate it
   - It was fairly easy to put it into the mains power box
 
+Arduino-based Thermostat/Solar heating controller
+  - I needed to control an installation with a radiator pump, a diesel heater and a solar panel
+  - The systems need to be connected together (radiator pump needs to run whenever solar panel OR diesel heater is on)
+  - I couldn't find a simple solution for this on the market, so I made one using an Arduino controller and a relay board
+
+
 # Status
 Openheat is (currently) a small project I've been using at home for some time. I'm confident it does what it's expected in my scenario, but it's currently not deployable for anyone without some programming expertise.
 

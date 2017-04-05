@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger("smarthome.rdf302")
 
+# Default modbus address, in case none is provided in the config file
 rdf302_address = 1
 
 def setModbusAddr(address):
@@ -83,3 +84,10 @@ def setOutTemp(newtemp):
 def disableSecDisplay():
 	# Set secondary display nothing - addr 40007 - value 0
 	rdf302_write_int(006,0)
+
+## Features unsupported in this model
+def isSolarInt():
+	return 0
+
+def getCurrentMode():
+	return "none"
