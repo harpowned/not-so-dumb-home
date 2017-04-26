@@ -13,7 +13,7 @@ import getopt
 import paho.mqtt.client as mqtt
 import json
 
-VERSION="1.6.2"
+VERSION="1.6.3"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -32,6 +32,9 @@ secondDisplayTimeSet = datetime.datetime(2000,1,1,0,0)
 testRun = False
 mqtt_topic = ""
 
+consecutiveCommErrors = 0
+maxConsecutiveCommErrors = 5
+commWatchdogOn = True
  
 #----------------------------------------------------------------------
 
@@ -158,6 +161,8 @@ thermostat_datafunctions_set = [
 def on_message(mqttClient, userdata, msg):
 	logger.debug("MQTT message received: "+msg.topic+" - "+str(msg.payload))
 	global secondDisplayOutdoor
+	global consecutiveCommErrors
+	global commWatchdogOn
 	try:
 		jsonMsg = json.loads(msg.payload)
 		response = {}
@@ -184,7 +189,8 @@ def on_message(mqttClient, userdata, msg):
 					response["query_id"] = jsonMsg["query_id"]
 				response["device"] = "powermeter"
 				response["command"] = "readings"
-				mqttClient.publish(mqtt_topic,json.dumps(response))
+				consecutiveCommErrors = 0
+				mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
 		## Process thermostat GET commands
 		elif device == "thermostat" and command == "get":
 			thermostat_data = []
@@ -203,7 +209,8 @@ def on_message(mqttClient, userdata, msg):
 				response["command"] = "readings"
 				if "query_id" in jsonMsg:
 					response["query_id"] = jsonMsg["query_id"]
-				mqttClient.publish(mqtt_topic,json.dumps(response))
+				consecutiveCommErrors = 0
+				mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
 		## Process thermostat SET commands
 		elif device == "thermostat" and command == "set":
 			thermostat_data = []
@@ -222,6 +229,10 @@ def on_message(mqttClient, userdata, msg):
 		logger.warning("Received invalid json (invalid type)")
 	except RuntimeError:
 		logger.warning("No response to a query")
+		consecutiveCommErrors = consecutiveCommErrors + 1
+		if commWatchdogOn and consecutiveCommErrors > maxConsecutiveCommErrors:
+			logger.error("%s consecutive communication errors. Quitting.." % consecutiveCommErrors)
+			die()
 	except:
 		die()
 	
@@ -241,7 +252,7 @@ def print_usage():
 
 def on_connect(mqttClient, userdata, flags, rc):
 	logger.info("Connected to MQTT server")
-	mqttClient.subscribe(mqtt_topic)
+	mqttClient.subscribe(mqtt_topic, qos=1)
 	
 
 
@@ -331,9 +342,6 @@ def main(args):
 	mqtt_port = Config.get("server-mqtt","port")
 	mqtt_topic = Config.get("server-mqtt","topic")
 	mqtt_ssl = Config.get("server-mqtt","ssl")
-	mqtt_cacert = Config.get("server-mqtt","cacert")
-	mqtt_clientcert = Config.get("server-mqtt","clientcert")
-	mqtt_clientkey = Config.get("server-mqtt","clientkey")
 
 	instanceName = Config.get("deviceInterface","instanceName")
 	
@@ -342,6 +350,9 @@ def main(args):
 	mqttClient.on_message = on_message
 	if mqtt_ssl == "yes":
 		import ssl
+		mqtt_cacert = Config.get("server-mqtt","cacert")
+		mqtt_clientcert = Config.get("server-mqtt","clientcert")
+		mqtt_clientkey = Config.get("server-mqtt","clientkey")
 		if mqtt_clientcert:	
 			mqttClient.tls_set(mqtt_cacert, certfile=mqtt_clientcert, keyfile=mqtt_clientkey, cert_reqs=ssl.CERT_REQUIRED,tls_version=ssl.PROTOCOL_TLSv1, ciphers=None)
 		else:

@@ -126,7 +126,7 @@ def logging_scheduler():
 
 
 def print_usage():
-	print 'Usage: loggingScheduler.py [-c <configfile>, -v]'
+	print 'Usage: loggingSender.py [-c <configfile>, -v]'
 	print '	-c <configfile> : Read config file from nonstandard location'
 	print '	-v : Enable verbose output'
 	print ' If no config file is specified using -c, config file is loaded from the first existing location in the following:'

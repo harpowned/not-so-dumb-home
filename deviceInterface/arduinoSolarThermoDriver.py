@@ -107,7 +107,7 @@ def getStatusData(key):
 			if elapsed > timeout:
 				serialAnswerRequested = False
 				raise RuntimeError()
-			time.sleep(0.1)
+			time.sleep(0.2)
 	logger.debug("Response is %s" % response)
 	return response
 
@@ -143,11 +143,7 @@ def getCurrentMode():
 	isheating = getStatusData("mode")
 
 def isSolarOn():
-	issolaron = getStatusData("solar")
-	if issolaron == "true":
-		return True
-	else:
-		return False
+	return getStatusData("solar")
 
 def isSolarInt():
 	if isSolarOn():
