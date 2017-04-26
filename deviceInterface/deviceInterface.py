@@ -149,12 +149,10 @@ thermostat_datafunctions_get = [
 thermostat_datatypes_set = [
 	"setpoint",
 	"outtemp",
-	"enableseconddisplay",
 ]
 thermostat_datafunctions_set = [
 	"setSetpoint",
 	"setOutTemp",
-	"enableSecDisplay",
 ]
 
 
