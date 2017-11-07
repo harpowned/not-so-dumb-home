@@ -93,6 +93,7 @@ def get_temp_at(date):
 		for (date_start,date_end,temp) in cursor:
 			set_temp = temp
 			result = True
+		cursor.close()
 		cnx.close()
 		if result:
 			return set_temp
@@ -116,6 +117,7 @@ def get_temp_at(date):
 			set_temp = temp[0]
 			result = True
 		if result:
+			cursor.close()
 			cnx.close()
 			return set_temp
 		cursor.execute(query_2, [q_dow])
@@ -124,6 +126,7 @@ def get_temp_at(date):
 			set_temp = temp[0]
 			result = True
 		if result:
+			cursor.close()
 			cnx.close()
 			return set_temp
 		cursor.execute(query_3, [q_dow])
@@ -132,6 +135,7 @@ def get_temp_at(date):
 			set_temp = temp[0]
 			result = True
 		if result:
+			cursor.close()
 			cnx.close()
 			return set_temp
 		cursor.execute(query_4, [q_dow,q_time])
@@ -140,6 +144,7 @@ def get_temp_at(date):
 			set_temp = temp[0]
 			result = True
 		if result:
+			cursor.close()
 			cnx.close()
 			return set_temp
 		logger.error("Error! Time in regular, but no regular events returned")
@@ -153,6 +158,7 @@ def time_in_exception(date):
 	cursor.execute(query, [date])
 	for (date_start,date_end,temp) in cursor:
 		in_exception = True
+	cursor.close()
 	cnx.close()
 	logger.debug("Are we in exception at %s? %s" % (date,in_exception))
 	return in_exception
@@ -176,6 +182,7 @@ def schedule_updater():
 			for result in cursor:
 				alljobs+=str(result)
 	#		print alljobs
+			cursor.close()
 			cnx.close()
 			scheduled_update = False
 			if not last_updated or last_updated < (datetime.datetime.now() - datetime.timedelta(hours=6)):
@@ -247,6 +254,7 @@ def update_schedule():
 		if not (job_time < current_time) and (not time_in_exception(job_time)):
 			logger.debug("Regular job programmed. At %s, set the temp to %s" % (job_time,job_temp))
 			sched.add_job(setTemp,'date', run_date=job_time, args=[job_temp])
+	cursor.close()
 	cnx.close()
 
 def print_usage():
@@ -259,9 +267,166 @@ def print_usage():
 	
 	sys.exit(2)
 
+def on_message(mqttClient, userdata, msg):
+	logger.debug("MQTT message received: "+msg.topic+" - "+str(msg.payload))
+	try:
+		jsonMsg = json.loads(msg.payload)
+		command = jsonMsg["command"]
+		logger.debug("Command is %s",command)
+		if command == "getHeatingSchedulingRegular":
+			response = {}
+			response["command"] = "heatingSchedulingRegular"
+			response["schedule"] = []
+			sql = "SELECT id,name,dow,temp,time,enabled from heating_regular"
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			cursor.execute(sql, ())
+			for (entryId,name,dow,temp,time,enabled) in cursor:
+				entry = {}
+				entry["id"] = entryId
+				entry["name"] = name
+				entry["dow"] = dow
+				entry["temp"] = temp
+				entry["time"] = str(time)
+				entry["enabled"] = enabled
+				response["schedule"].append(entry)
+			cursor.close()
+			cnx.close()
+			mqttClient.publish(mqtt_topic,json.dumps(response))
+		elif command == "updateHeatingSchedulingRegular":
+			if "entry" not in jsonMsg:
+				return
+			entry = jsonMsg["entry"]
+			if "id" not in entry:
+				return
+			entryId = entry["id"]
+			if "name" not in entry:
+				return
+			name = entry["name"]
+			if "dow" not in entry:
+				return
+			dow = entry["dow"]
+			if "temp" not in entry:
+				return
+			temp = entry["temp"]
+			if "time" not in entry:
+				return
+			time = entry["time"]
+			if "enabled" not in entry:
+				return
+			enabled = entry["enabled"]
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			logger.debug("Executing SQL query")
+			logger.debug("UPDATE `heating_regular` SET `name` = %s, `dow` = %s, `temp` = %s, `time` = %s, `enabled` = %s WHERE `heating_regular`.`id` = %s;" %(name,dow,temp,time,enabled,entryId))
+			cursor.execute("UPDATE `heating_regular` SET `name` = %s, `dow` = %s, `temp` = %s, `time` = %s, `enabled` = %s WHERE `heating_regular`.`id` = %s;", [name,dow,temp,time,enabled,entryId])
+			cnx.commit()
+			cursor.close()
+			cnx.close()
+		elif command == "insertHeatingSchedulingRegular":
+			if "entry" not in jsonMsg:
+				return
+			entry = jsonMsg["entry"]
+			if "name" not in entry:
+				return
+			name = entry["name"]
+			if "dow" not in entry:
+				return
+			dow = entry["dow"]
+			if "temp" not in entry:
+				return
+			temp = entry["temp"]
+			if "time" not in entry:
+				return
+			time = entry["time"]
+			if "enabled" not in entry:
+				return
+			enabled = entry["enabled"]
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			logger.debug("Executing SQL query")
+			cursor.execute("INSERT INTO `heating_regular` (`name`,`dow`,`temp`,`time`,`enabled`) VALUES (%s,%s,%s,%s,%s);", [name,dow,temp,time,enabled])
+			cnx.commit()
+			cursor.close()
+			cnx.close()
+			
+		elif command == "getHeatingSchedulingExcept":
+			response = {}
+			response["command"] = "heatingSchedulingExcept"
+			response["schedule"] = []
+			sql = "SELECT id,name,temp,date_start,date_end from heating_except"
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			cursor.execute(sql, ())
+			for (entryId,name,temp,date_start,date_end) in cursor:
+				entry = {}
+				entry["id"] = entryId
+				entry["name"] = name
+				entry["temp"] = temp
+				entry["date_start"] = str(date_start)
+				entry["date_end"] = str(date_end)
+				response["schedule"].append(entry)
+			cursor.close()
+			cnx.close()
+			mqttClient.publish(mqtt_topic,json.dumps(response))
+		elif command == "updateHeatingSchedulingExcept":
+			if "entry" not in jsonMsg:
+				return
+			entry = jsonMsg["entry"]
+			if "id" not in entry:
+				return
+			entryId = entry["id"]
+			if "name" not in entry:
+				return
+			name = entry["name"]
+			if "dow" not in entry:
+				return
+			temp = entry["temp"]
+			if "date_start" not in entry:
+				return
+			date_start = entry["date_start"]
+			if "date_end" not in entry:
+				return
+			date_end = entry["date_end"]
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			logger.debug("Executing SQL query")
+			cursor.execute("UPDATE `heating_except` SET `name` = %s, `temp` = %s, `date_start` = %s, `date_end` = %s WHERE `heating_except`.`id` = %s;", [name,temp,time,date_start,date_end])
+			cnx.commit()
+			cursor.close()
+			cnx.close()
+		elif command == "insertHeatingSchedulingExcept":
+			if "entry" not in jsonMsg:
+				return
+			entry = jsonMsg["entry"]
+			if "name" not in entry:
+				return
+			name = entry["name"]
+			if "dow" not in entry:
+				return
+			temp = entry["temp"]
+			if "date_start" not in entry:
+				return
+			date_start = entry["date_start"]
+			if "date_end" not in entry:
+				return
+			date_end = entry["date_end"]
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			logger.debug("Executing SQL query")
+			cursor.execute("INSERT INTO `heating_except` (`name`,`temp`,`date_start`,`date_end`) VALUES (%s,%s,%s,%s);", [name,temp,date_start,date_end])
+			cnx.commit()
+			cursor.close()
+			cnx.close()
+	except:
+		logger.debug(traceback.format_exc())
+		pass
+		
+	
+
 def on_connect(mqttClient, userdata, flags, rc):
 	logger.info("Connected to MQTT server")
-#	mqttClient.subscribe(mqtt_topic)
+	mqttClient.subscribe(mqtt_topic)
 
 def main(args):
 	global DB_host
@@ -334,7 +499,7 @@ def main(args):
 	
 	mqttClient = mqtt.Client(client_id=instanceName, clean_session=False, userdata=None, protocol="MQTTv311", transport="tcp")
 	mqttClient.on_connect = on_connect
-#	mqttClient.on_message = on_message
+	mqttClient.on_message = on_message
 	if mqtt_ssl == "yes":
 		import ssl
 		if mqtt_clientcert:	
