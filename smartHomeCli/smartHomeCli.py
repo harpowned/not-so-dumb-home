@@ -114,7 +114,7 @@ def get_thermostat_status():
 	queryAnswer = ""
 	queryAnswerEvent.wait(QUERY_TIMEOUT)
 	if not queryAnswer:
-		return false
+		return False
 	else:
 		return queryAnswer["values"]
 
@@ -129,7 +129,7 @@ def get_powermeter_power():
 	queryAnswer = ""
 	queryAnswerEvent.wait(QUERY_TIMEOUT)
 	if not queryAnswer:
-		return false
+		return False
 	else:
 		return queryAnswer["values"]["power"]
 
