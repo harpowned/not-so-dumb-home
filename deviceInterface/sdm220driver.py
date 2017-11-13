@@ -5,6 +5,7 @@ import logging
 logger = logging.getLogger("smarthome.sdm220")
 
 sdm220_address = 1 ## Modbus address of device
+maxpower = 0
 
 def sdm220_request(data_address):
 	return modbusdriver.modbus_read_float(sdm220_address,data_address)
@@ -12,6 +13,15 @@ def sdm220_request(data_address):
 def setModbusAddr(address):
 	global sdm220_address
 	sdm220_address = int(address)
+
+def setMaxPower(par):
+	global maxpower
+	maxpower = int(par)
+
+def getMaxPower():
+	global maxpower
+	return maxpower
+
 
 def getVoltage():
 	# 30001 - Voltage - Spannung - Volts

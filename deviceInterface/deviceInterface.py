@@ -77,6 +77,7 @@ def print_powermeter():
 	powermeter.getAccExportReactiveEnergy()
 	powermeter.getAccTotalActiveEnergy()
 	powermeter.getAccTotalReactiveEnergy()
+	powermeter.getMaxPower()
 
 def print_thermostat():
 	thermostat.getCurrentMode()
@@ -114,6 +115,7 @@ powermeter_datatypes_get = [
 	"accere",
 	"totact",
 	"totrea",
+	"maxpower",
 	
 ]
 powermeter_datafunctions_get = [
@@ -131,6 +133,7 @@ powermeter_datafunctions_get = [
 	"getAccExportReactiveEnergy",
 	"getAccTotalActiveEnergy",
 	"getAccTotalReactiveEnergy",
+	"getMaxPower",
 ]
 thermostat_datatypes_get = [
 	"curtemp",
@@ -331,6 +334,7 @@ def main(args):
 	elif pmType == "sdm220":
 		import sdm220driver as powermeter
 		powermeter.setModbusAddr(Config.get("powermeter-sdm220","modbus-address"))
+		powermeter.setMaxPower(Config.get("powermeter-sdm220","maxpower"))
 	else:
 		logger.error("Unsupported power meter type. Check config file")
 		sys.exit(2)
