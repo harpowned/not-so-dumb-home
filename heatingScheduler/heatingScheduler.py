@@ -15,7 +15,7 @@ import getopt
 import paho.mqtt.client as mqtt
 import json
 
-VERSION="1.6"
+VERSION="1.7"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -349,6 +349,21 @@ def on_message(mqttClient, userdata, msg):
 			cnx.commit()
 			cursor.close()
 			cnx.close()
+		elif command == "deleteHeatingSchedulingRegular":
+			if "entry" not in jsonMsg:
+				return
+			entry = jsonMsg["entry"]
+			if "id" not in entry:
+				return
+			entryId = entry["id"]
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			logger.debug("Executing SQL query")
+			cursor.execute("DELETE FROM `heating_regular` WHERE `heating_regular`.`id` = %s;", [entryId])
+			cnx.commit()
+			cursor.close()
+			cnx.close()
+			
 			
 		elif command == "getHeatingSchedulingExcept":
 			response = {}
@@ -418,6 +433,19 @@ def on_message(mqttClient, userdata, msg):
 			cnx.commit()
 			cursor.close()
 			cnx.close()
+		elif command == "deleteHeatingSchedulingExcept":
+			if "entry" not in jsonMsg:
+				return
+			entry = jsonMsg["entry"]
+			if "id" not in entry:
+				return
+			entryId = entry["id"]
+			cnx = mysql.connector.connect(user=DB_user, password=DB_password, host=DB_host, database=DB_database)
+			cursor = cnx.cursor()
+			logger.debug("Executing SQL query")
+			cursor.execute("DELETE FROM `heating_except` WHERE `heating_except`.`id` = %s;", [entryId])
+			cnx.commit()
+			cursor.close()
 	except:
 		logger.debug(traceback.format_exc())
 		pass
