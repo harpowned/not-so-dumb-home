@@ -62,26 +62,16 @@ def on_message(mqttClient, userdata, msg):
 	logger.debug("MQTT message received: "+msg.topic+" - "+str(msg.payload))
 	global consecutiveCommErrors
 	global devices
-	logger.info("Iterating on devices")
-	for device in devices:
-		print device
 	try:
 		jsonMsg = json.loads(msg.payload)
 		response = {}
 		deviceName = jsonMsg["device"]
 		command = jsonMsg["command"]
-		logger.debug("Command is %s",command)
-		logger.debug("Device name is %s",deviceName)
 		## Iterate on all active devices
 		for device in devices:
 			## If the message is addressed to this device, or to all devices of this type, process it
-			logger.info("deviceName: %s",deviceName)
-			logger.info("Device getname: %s",device.getName())
-			logger.info("Device gettype: %s",device.getType())
 			if (device.getName() == deviceName) or (device.getType() == deviceName):
-				logger.info("Message is addressed to this device (%s)",device.getName())
 				if command == "get":
-					logger.info("Command is get")
 					## create the response and fill the common fields
 					response = {}
 					response["device"] = deviceName
@@ -94,9 +84,7 @@ def on_message(mqttClient, userdata, msg):
 					gettable_vars = device.getGettableVars()
 					keys = jsonMsg["keys"]
 					for key in keys:
-						logger.debug("Checking for requested key %s",key)
 						if key in gettable_vars:
-							logger.debug("Key is gettable, adding to response..")
 							if "values" not in response:
 								response["values"] = {}
 							response["values"][key] = str(device.getValue(key))
@@ -104,7 +92,12 @@ def on_message(mqttClient, userdata, msg):
 					if response["values"]:
 						consecutiveCommErrors = 0
 						mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
-
+				if command == "set":
+					settable_vars = device.getSettableVars()
+					key = jsonMsg["key"]
+					value = jsonMsg["value"]
+					if key in settable_vars:
+						device.setValue(key,value)
 #	except ValueError:
 #		logger.warning("Received invalid json (invalid value)")
 #	except KeyError:
