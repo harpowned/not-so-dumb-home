@@ -13,7 +13,7 @@ import getopt
 import paho.mqtt.client as mqtt
 import json
 
-VERSION="1.6.3"
+eERSION="1.7.0-dev"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
