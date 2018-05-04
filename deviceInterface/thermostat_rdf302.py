@@ -40,7 +40,7 @@ class Driver:
 		return self.deviceName
 
 	def getType(self):
-		return "Thermostat"
+		return "thermostat"
 
 	def getGettableVars(self):
 		return ["curtemp","setpoint","isheating"]

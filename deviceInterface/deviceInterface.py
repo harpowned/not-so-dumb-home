@@ -30,6 +30,8 @@ consecutiveCommErrors = 0
 maxConsecutiveCommErrors = 5
 commWatchdogOn = True
 
+instanceName = ""
+
 devices = [] 
 
 #----------------------------------------------------------------------
@@ -62,14 +64,34 @@ def on_message(mqttClient, userdata, msg):
 	logger.debug("MQTT message received: "+msg.topic+" - "+str(msg.payload))
 	global consecutiveCommErrors
 	global devices
+	global instanceName
 	try:
 		jsonMsg = json.loads(msg.payload)
+		if "command" not in jsonMsg:
+			logger.warn("Received message without a valid command field")
+			return
 		response = {}
-		deviceName = jsonMsg["device"]
 		command = jsonMsg["command"]
+		if command == "listDevices":
+			logger.info("Requested device list")
+			response["command"] = "deviceList"
+			response["instanceName"] = instanceName
+			response["devices"] = []
+			for device in devices:
+				deviceInfo = {}
+				deviceInfo["name"] = device.getName()
+				deviceInfo["type"] = device.getType()
+				response["devices"].append(deviceInfo)
+			mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
+			return
+		if "device" not in jsonMsg:
+			logger.warn("Received message without a valid device field")
+			return
+		deviceName = jsonMsg["device"]
 		## Iterate on all active devices
 		for device in devices:
 			## If the message is addressed to this device, or to all devices of this type, process it
+			logger.debug("msg destination is %s. device name is %s, device type is %s",deviceName,device.getName(),device.getType())
 			if (device.getName() == deviceName) or (device.getType() == deviceName):
 				if command == "get":
 					## create the response and fill the common fields
@@ -78,7 +100,6 @@ def on_message(mqttClient, userdata, msg):
 					response["command"] = "readings"
 					## Fill the query ID if the query has one
 					if "query_id" in jsonMsg:
-						logger.debug("Responding to query %s" % query_id)
 						response["query_id"] = jsonMsg["query_id"]
 					## Get the requested values from the device
 					gettable_vars = device.getGettableVars()
@@ -96,6 +117,7 @@ def on_message(mqttClient, userdata, msg):
 					settable_vars = device.getSettableVars()
 					key = jsonMsg["key"]
 					value = jsonMsg["value"]
+					logger.debug("Set command received for device %s, key %s, value %s",deviceName,key,value)
 					if key in settable_vars:
 						device.setValue(key,value)
 #	except ValueError:
@@ -137,6 +159,7 @@ def main(args):
 	global devices
 	global testRun
 	global mqtt_topic
+	global instanceName
 
 	config_file = ""
 	debug = False
