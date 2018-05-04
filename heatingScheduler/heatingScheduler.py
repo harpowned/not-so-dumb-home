@@ -15,7 +15,7 @@ import getopt
 import paho.mqtt.client as mqtt
 import json
 
-VERSION="1.7"
+VERSION="1.7.0"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -43,6 +43,7 @@ DB_host=''
 DB_database=''
 
 global sched
+deviceName = ""
 
 def die():
         print(traceback.format_exc())
@@ -72,8 +73,9 @@ def init_log(path):
 	logging.getLogger('').addHandler(console)
 
 def setTemp(temp):
+	global deviceName
 	msg = {}
-	msg["device"] = "thermostat"
+	msg["device"] = deviceName
 	msg["command"] = "set"
 	msg["key"] = "setpoint"
 	msg["value"] = temp
@@ -464,6 +466,7 @@ def main(args):
 	global sched
 	global mqttClient
 	global mqtt_topic
+	global deviceName
 
 	config_file = ""
 
@@ -502,6 +505,9 @@ def main(args):
 	if db_type not in supported_dbs:
 		print "Error: unsupported database type. Check config file"
 		sys.exit(2)
+
+	
+	deviceName = Config.get("heatingScheduler","deviceName")
 	
 	## Only mysql is supported right now
 	DB_user=Config.get("database-mysql","user")
