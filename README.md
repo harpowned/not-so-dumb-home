@@ -1,14 +1,17 @@
-# openheat
-Automatic scheduler and remote control for home heating
+# Not-so-dumb-home
+Because I wouldn't go as far as to call it smart..
+
+Not-so-dumb-home 2.0 is in development, it's NOT READY!
 
 # Description and features
-Openheat is the core of a small home automation project, with the following features:
+ Not-so-dumb-home is the core of a small home automation project, with the following features:
  - Automatic control of a thermostat
 	- Monitoring of ambient temperature (readings are stored into a Zabbix server)
 	- Periodic change of temperature (every monday at 5, set temperature to 21 degrees)
 	- Exceptions (On the 15th of January, from 7 to 13, ignore normal programming and set 18 degrees instead)
  - Reading of a power meter
 	- Periodic reading of the power meter and storing data into a Zabbix server
+- Integration with Home Assistant
 
 # Why yet another programmer?
 I have underfloor heating in my new home. Yay!
