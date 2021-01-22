@@ -1,19 +1,17 @@
 #!/usr/bin/env python
 import sys
-import time
-import socket
 import logging
-import threading
 import traceback
 import os
 from logging.handlers import RotatingFileHandler
-import datetime
 import ConfigParser
 import getopt
 import paho.mqtt.client as mqtt
 import json
+import ast
+import importlib
 
-VERSION="1.6.3"
+VERSION="1.7.0"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -25,17 +23,17 @@ def_config_paths = [
 globalLogger = logging.getLogger("smarthome")
 logger = logging.getLogger("smarthome.deviceInterface")
 
-secondDisplayOutdoor = False
-secondDisplayTimeout = 15 # minutes
-secondDisplayTimeSet = datetime.datetime(2000,1,1,0,0)
-
 testRun = False
 mqtt_topic = ""
 
 consecutiveCommErrors = 0
 maxConsecutiveCommErrors = 5
 commWatchdogOn = True
- 
+
+instanceName = ""
+
+devices = [] 
+
 #----------------------------------------------------------------------
 
 def die():
@@ -62,178 +60,78 @@ def init_log(path):
 	# add the handler to the root logger
 	logging.getLogger('').addHandler(console)
 
-def print_powermeter():
-	powermeter.getVoltage()
-	powermeter.getCurrent()
-	powermeter.getPower()
-	powermeter.getApPower()
-	powermeter.getRePower()
-	powermeter.getPowerFactor()
-	powermeter.getPhaseAngle()
-	powermeter.getFrequency()
-	powermeter.getAccImportActiveEnergy()
-	powermeter.getAccExportActiveEnergy()
-	powermeter.getAccImportReactiveEnergy()
-	powermeter.getAccExportReactiveEnergy()
-	powermeter.getAccTotalActiveEnergy()
-	powermeter.getAccTotalReactiveEnergy()
-	powermeter.getMaxPower()
-
-def print_thermostat():
-	thermostat.getCurrentMode()
-	thermostat.getCurrentTemp()
-	thermostat.getCurrentSetpoint()
-	thermostat.isHeating()
-
-def isOutTempTimeoutExpired():
-	global secondDisplayTimeSet
-	global secondDisplayTimeout
-	# if secondDisplayTimeSet + secondDisplayTimeout is older than now, return true
-	if (secondDisplayTimeSet + datetime.timedelta(minutes=secondDisplayTimeout) < datetime.datetime.now()):
-		logger.info("Timeout is expired (set on %s, now is %s)" % (secondDisplayTimeSet,datetime.datetime.now()))
-		return True
-	logger.debug("Timeout is not expired")
-	return False
-
-def refreshOutTempTimeout():
-	global secondDisplayTimeSet
-	logger.debug("Refreshing timeout")
-	secondDisplayTimeSet = datetime.datetime.now()
-
-powermeter_datatypes_get = [
-	"volt",
-	"current",
-	"power",
-	"appower",
-	"repower",
-	"pfactor",
-	"phase",
-	"freq",
-	"acciae",
-	"acceae",
-	"accire",
-	"accere",
-	"totact",
-	"totrea",
-	"maxpower",
-	
-]
-powermeter_datafunctions_get = [
-	"getVoltage",
-	"getCurrent",
-	"getPower",
-	"getApPower",
-	"getRePower",
-	"getPowerFactor",
-	"getPhaseAngle",
-	"getFrequency",
-	"getAccImportActiveEnergy",
-	"getAccExportActiveEnergy",
-	"getAccImportReactiveEnergy",
-	"getAccExportReactiveEnergy",
-	"getAccTotalActiveEnergy",
-	"getAccTotalReactiveEnergy",
-	"getMaxPower",
-]
-thermostat_datatypes_get = [
-	"curtemp",
-	"setpoint",
-	"isheating",
-	"solar",
-	"mode",
-]
-thermostat_datafunctions_get = [
-	"getCurrentTemp",
-	"getCurrentSetpoint",
-	"isHeatingInt",
-	"isSolarInt",
-	"getCurrentMode",
-]
-thermostat_datatypes_set = [
-	"setpoint",
-	"outtemp",
-]
-thermostat_datafunctions_set = [
-	"setSetpoint",
-	"setOutTemp",
-]
-
-
 def on_message(mqttClient, userdata, msg):
 	logger.debug("MQTT message received: "+msg.topic+" - "+str(msg.payload))
-	global secondDisplayOutdoor
 	global consecutiveCommErrors
-	global commWatchdogOn
+	global devices
+	global instanceName
 	try:
 		jsonMsg = json.loads(msg.payload)
+		if "command" not in jsonMsg:
+			logger.warn("Received message without a valid command field")
+			return
 		response = {}
-		device = jsonMsg["device"]
-		logger.debug("Device is %s",device)
 		command = jsonMsg["command"]
-		logger.debug("Command is %s",command)
-		## Process powermeter GET commands
-
-		if device == "powermeter" and command == "get":
-			powermeter_data = []
-			keys = jsonMsg["keys"]
-			for key in keys:
-				if key in powermeter_datatypes_get:
-					powermeter_data.append(key)
-			for datatype,function in zip(powermeter_datatypes_get,powermeter_datafunctions_get):
-				if datatype in powermeter_data:
-					if "values" not in response:
-						response["values"] = {}
-					methodToCall = getattr(powermeter, function)
-					response["values"][datatype] = str(methodToCall())
-			if response:
-				if "query_id" in jsonMsg:
-					response["query_id"] = jsonMsg["query_id"]
-				response["device"] = "powermeter"
-				response["command"] = "readings"
-				consecutiveCommErrors = 0
-				mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
-		## Process thermostat GET commands
-		elif device == "thermostat" and command == "get":
-			thermostat_data = []
-			keys = jsonMsg["keys"]
-			for key in keys:
-				if key in thermostat_datatypes_get:
-					thermostat_data.append(key)
-			for datatype,function in zip(thermostat_datatypes_get,thermostat_datafunctions_get):
-				if datatype in thermostat_data:
-					if "values" not in response:
-						response["values"] = {}
-					methodToCall = getattr(thermostat, function)
-					response["values"][datatype] = str(methodToCall())
-			if response:
-				response["device"] = "thermostat"
-				response["command"] = "readings"
-				if "query_id" in jsonMsg:
-					response["query_id"] = jsonMsg["query_id"]
-				consecutiveCommErrors = 0
-				mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
-		## Process thermostat SET commands
-		elif device == "thermostat" and command == "set":
-			thermostat_data = []
-			key = jsonMsg["key"]
-			value = jsonMsg["value"]
-			# Asking for a nonexisting index will raise an exception, so we don't need to treat the case here
-			logger.info("Thermostat SET command, Key: %s, value: %s" % (key,value))
-			keyIndex = thermostat_datatypes_set.index(key)
-			methodToCall = getattr(thermostat,thermostat_datafunctions_set[keyIndex])
-			methodToCall(value)
-	except ValueError:
-		logger.warning("Received invalid json (invalid value)")
-	except KeyError:
-		logger.warning("Received invalid json (invalid key)")
-	except TypeError:
-		logger.warning("Received invalid json (invalid type)")
-	except RuntimeError:
-		logger.warning("No response to a query")
-		consecutiveCommErrors = consecutiveCommErrors + 1
-		if commWatchdogOn and consecutiveCommErrors > maxConsecutiveCommErrors:
-			logger.error("%s consecutive communication errors. Quitting.." % consecutiveCommErrors)
-			die()
+		if command == "listDevices":
+			logger.info("Requested device list")
+			response["command"] = "deviceList"
+			response["instanceName"] = instanceName
+			response["devices"] = []
+			for device in devices:
+				deviceInfo = {}
+				deviceInfo["name"] = device.getName()
+				deviceInfo["type"] = device.getType()
+				response["devices"].append(deviceInfo)
+			mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
+			return
+		if "device" not in jsonMsg:
+			logger.warn("Received message without a valid device field")
+			return
+		deviceName = jsonMsg["device"]
+		## Iterate on all active devices
+		for device in devices:
+			## If the message is addressed to this device, or to all devices of this type, process it
+			logger.debug("msg destination is %s. device name is %s, device type is %s",deviceName,device.getName(),device.getType())
+			if (device.getName() == deviceName) or (device.getType() == deviceName):
+				if command == "get":
+					## create the response and fill the common fields
+					response = {}
+					response["device"] = deviceName
+					response["command"] = "readings"
+					## Fill the query ID if the query has one
+					if "query_id" in jsonMsg:
+						response["query_id"] = jsonMsg["query_id"]
+					## Get the requested values from the device
+					gettable_vars = device.getGettableVars()
+					keys = jsonMsg["keys"]
+					for key in keys:
+						if key in gettable_vars:
+							if "values" not in response:
+								response["values"] = {}
+							response["values"][key] = str(device.getValue(key))
+					## If any values were returned, respond
+					if response["values"]:
+						consecutiveCommErrors = 0
+						mqttClient.publish(mqtt_topic,json.dumps(response),qos=1)
+				if command == "set":
+					settable_vars = device.getSettableVars()
+					key = jsonMsg["key"]
+					value = jsonMsg["value"]
+					logger.debug("Set command received for device %s, key %s, value %s",deviceName,key,value)
+					if key in settable_vars:
+						device.setValue(key,value)
+#	except ValueError:
+#		logger.warning("Received invalid json (invalid value)")
+#	except KeyError:
+#		logger.warning("Received invalid json (invalid key)")
+#	except TypeError:
+#		logger.warning("Received invalid json (invalid type)")
+#	except RuntimeError:
+#		logger.warning("No response to a query")
+#		consecutiveCommErrors = consecutiveCommErrors + 1
+#		if commWatchdogOn and consecutiveCommErrors > maxConsecutiveCommErrors:
+#			logger.error("%s consecutive communication errors. Quitting.." % consecutiveCommErrors)
+#			die()
 	except:
 		die()
 	
@@ -258,10 +156,10 @@ def on_connect(mqttClient, userdata, flags, rc):
 
 
 def main(args):
-	global thermostat
-	global powermeter
+	global devices
 	global testRun
 	global mqtt_topic
+	global instanceName
 
 	config_file = ""
 	debug = False
@@ -306,39 +204,22 @@ def main(args):
 	if "-t" in args:
 		logger.info("Test mode run")
 
-	
-	thermoType = Config.get("deviceInterface","thermostat")
-	if thermoType == "none":
-		import nullThermo as thermostat
-	elif thermoType == "rdf302":
-		import rdf302driver as thermostat
-		thermostat.setModbusAddr(Config.get("thermostat-rdf302","modbus-address"))
-	elif thermoType == "arduinoSolarThermo":
-		import arduinoSolarThermoDriver as thermostat
-		thermostat.setSerialAddr(Config.get("thermostat-arduinoSolarThermo","serial-address"))
-		thermostat.openSerial()
-		logger.info("Sleeping to allow thermostat to boot..")
-		time.sleep(5)
-		solarSchedulerOn = Config.get("thermostat-arduinoSolarThermo","solarScheduler")
-		if solarSchedulerOn == "yes":
-			solarTimeOn = int(Config.get("thermostat-arduinoSolarThermo","solarTimeOn"))
-			solarTimeOff = int(Config.get("thermostat-arduinoSolarThermo","solarTimeOff"))
-			thermostat.startSolarScheduler(solarTimeOn,solarTimeOff)
-	else:
-		logger.error("Unsupported thermostat type. Check config file")
-		sys.exit(2)
-
-	pmType = Config.get("deviceInterface","powermeter")
-	if pmType == "none":
-		import nullPowerMeter as powermeter
-	elif pmType == "sdm220":
-		import sdm220driver as powermeter
-		powermeter.setModbusAddr(Config.get("powermeter-sdm220","modbus-address"))
-		powermeter.setMaxPower(Config.get("powermeter-sdm220","maxpower"))
-	else:
-		logger.error("Unsupported power meter type. Check config file")
-		sys.exit(2)
-
+	enabledDevices = ast.literal_eval(Config.get("deviceInterface","enabled_devices"))
+	deviceDrivers = dict()
+	for deviceName in enabledDevices:
+		deviceType = Config.get(deviceName,"type")
+		deviceModel = Config.get(deviceName,"model")
+		deviceDriver = deviceType+"_"+deviceModel
+		
+		## Load the driver for this device
+		if deviceDriver not in sys.modules:
+			deviceDrivers[deviceDriver] = importlib.import_module(deviceDriver)
+		driver = importlib.import_module(deviceDriver)
+		## Instantiate the device object
+		device = deviceDrivers[deviceDriver].Driver(deviceName,Config)
+		## Add the object to the running devices
+		devices.append(device)
+		
 	# Read MQTT config and connect to server
 	mqtt_host = Config.get("server-mqtt","host")
 	mqtt_port = Config.get("server-mqtt","port")
@@ -361,10 +242,6 @@ def main(args):
 			mqttClient.tls_set(mqtt_cacert, certfile=None, keyfile=None, cert_reqs=ssl.CERT_REQUIRED,tls_version=ssl.PROTOCOL_TLSv1, ciphers=None)
 	logger.debug("Now connecting to MQTT server")
 	mqttClient.connect(mqtt_host,port=mqtt_port,keepalive=60)
-
-	# As a default, we want to start with the secondary display disabled.
-	# It will be enabled the first time an outdoor temp reading is received
-	thermostat.disableSecDisplay()
 
 	if testRun:
 		runTest()

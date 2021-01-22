@@ -13,8 +13,9 @@ import paho.mqtt.client as mqtt
 import json
 from random import randint
 import zabbixSender as loggingServer
+import ast
 
-VERSION="1.6"
+VERSION="1.7.0"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -29,9 +30,7 @@ logpath=""
 globalLogger = logging.getLogger("smarthome")
 logger = logging.getLogger("smarthome.loggingSender")
 
-waitingForQuery = False
-
-global sched
+devices = [] 
 
 def die():
         print(traceback.format_exc())
@@ -60,13 +59,53 @@ def init_log(path):
 	# add the handler to the root logger
 	logging.getLogger('').addHandler(console)
 
-def sendDataToLoggingServer(device,values):
-	logger.debug("sendDataToLoggingServer")
-	deviceHostname = Config.get(device,"loggingServerHostname")
-	for value in values:
-		loggingServer.pushData(deviceHostname,value,values[value])
+class DeviceLogger:
+	def __init__(self,deviceName,config):
+		self.deviceName = deviceName
+		self.nameInServer = config.get(deviceName,"nameInServer")
+		self.interval = float(config.get(deviceName,"interval"))
+		self.variables = ast.literal_eval(Config.get(deviceName,"variables"))
+		self.launchedQueries = set()
 
-launchedQueries = set()
+		t = threading.Thread(target=self.loggingScheduler)
+		t.setDaemon(True)
+		t.start()
+
+	def loggingScheduler(self):
+		while True:
+			logger.debug("Logging loop running")
+			self.launchedQueries.clear()
+			logger.debug("Now processing device: %s" % self.deviceName)
+			query_id = randint(1,1000000000)
+			query = {}
+			query["device"] = self.deviceName
+			query["command"] = "get"
+			query["keys"] = self.variables
+			query["query_id"] = query_id
+			mqttClient.publish(mqtt_topic,json.dumps(query))
+			self.launchedQueries.add(query_id)
+			logger.debug(self.launchedQueries)
+			time.sleep(self.interval)
+
+	def newMessage(self,jsonMsg):
+		query_id = jsonMsg["query_id"]
+		if query_id in self.launchedQueries:
+			self.launchedQueries.discard(query_id)
+			if "device" not in jsonMsg:
+				logger.debug("Device not in json")
+				return
+			device = jsonMsg["device"]
+			if "values" not in jsonMsg:
+				logger.debug("Values not in json")
+				return
+			values = jsonMsg["values"]
+			self.sendDataToLoggingServer(values)
+
+	def sendDataToLoggingServer(self,values):
+		logger.debug("sendDataToLoggingServer")
+		for value in values:
+			loggingServer.pushData(self.nameInServer,value,values[value])
+
 
 def on_message(mqttClient, userdata, msg):
 	global launchedQueries
@@ -84,44 +123,12 @@ def on_message(mqttClient, userdata, msg):
 			logger.debug("Query ID not in json")
 			return
 		query_id = jsonMsg["query_id"]
-		if query_id in launchedQueries:
-			launchedQueries.discard(query_id)
-			if "device" not in jsonMsg:
-				logger.debug("Device not in json")
-				return
-			device = jsonMsg["device"]
-			if "values" not in jsonMsg:
-				logger.debug("Values not in json")
-				return
-			values = jsonMsg["values"]
-			sendDataToLoggingServer(device,values)
+		for device in devices:
+			device.newMessage(jsonMsg)
 	except:
         	logger.debug(traceback.format_exc())
 		pass
 
-def logging_scheduler():
-	global launchedQueries
-	devices_str = Config.get("loggingSender","devices")
-	devices = [x.strip() for x in devices_str.split(',')]
-	delay = int(Config.get("loggingSender","interval"))
-	while True:
-		logger.debug("Logging loop running")
-		launchedQueries.clear()
-		for device in devices:
-			logger.debug("Now processing device: %s" % device)
-			variables_str = Config.get(device,"variables")
-			variables = [x.strip() for x in variables_str.split(',')]
-			query_id = randint(1,1000000000)
-			query = {}
-			query["device"] = device
-			query["command"] = "get"
-			query["keys"] = variables
-			query["query_id"] = query_id
-			mqttClient.publish(mqtt_topic,json.dumps(query))
-			launchedQueries.add(query_id)
-			logger.debug(launchedQueries)
-			
-		time.sleep(delay)
 
 
 
@@ -210,9 +217,13 @@ def main(args):
 	logger.debug("Now connecting to MQTT server")
 	mqttClient.connect(mqtt_host,port=mqtt_port,keepalive=60)
 
-	t = threading.Thread(target=logging_scheduler)
-	t.daemon = True
-	t.start()
+	enabledDevices = ast.literal_eval(Config.get("loggingSender","enabled_devices"))
+	for deviceName in enabledDevices:
+		## Instantiate the device object
+		device = DeviceLogger(deviceName,Config)
+		## Add the object to the running devices
+		devices.append(device)
+		
 
 	mqttClient.loop_forever()
 

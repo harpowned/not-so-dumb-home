@@ -13,7 +13,7 @@ import paho.mqtt.client as mqtt
 import json
 from random import randint
 
-VERSION="1.6.3"
+VERSION="1.7.0"
 
 Config = ConfigParser.ConfigParser()
 def_config_paths = [
@@ -65,6 +65,7 @@ def weatherinfo_scheduler():
 			logger.debug("Updated weather info OK")
 			weatherinfo = {}
 			weatherinfo["device"] = "weatherstation"
+			weatherinfo["command"] = "report"
 			weatherinfo["currentTemp"] = weatherService.getCurrentTemp()
 			weatherinfo["currentHum"] = weatherService.getCurrentHum()
 			weatherinfo["currentPress"] = weatherService.getCurrentPress()
