@@ -221,7 +221,7 @@ def main(args):
 	for deviceName in enabledDevices:
 		## Instantiate the device object
 		device = DeviceLogger(deviceName,Config)
-		## Add the object to the running devices
+		## Add the object to the running drivers
 		devices.append(device)
 		
 
