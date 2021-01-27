@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import logging
 import urllib.request
 import traceback
