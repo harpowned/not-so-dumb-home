@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import modbusdriver_pymodbus as modbusdriver
 import logging
 import ConfigParser
