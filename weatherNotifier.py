@@ -1,13 +1,14 @@
 #!/usr/bin/python3
-import time
-import threading
+import argparse
+import configparser
+import json
 import logging
 import sys
-import json
-import configparser
-import argparse
-from libs import not_so_dumb_home_utils as utils
+import threading
+import time
+
 from libs import mqtt_connection as mqtt
+from libs import not_so_dumb_home_utils as utils
 
 APP_NAME = "weatherNotifier"
 VERSION = "2.0"

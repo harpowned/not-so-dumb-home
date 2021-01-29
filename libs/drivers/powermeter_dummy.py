@@ -2,8 +2,6 @@
 import logging
 
 
-
-
 class Driver:
     sampling_period = 5  # seconds
 

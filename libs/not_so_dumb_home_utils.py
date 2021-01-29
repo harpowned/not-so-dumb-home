@@ -1,8 +1,8 @@
 import logging
-from logging.handlers import RotatingFileHandler
 import os
-import traceback
 import sys
+import traceback
+from logging.handlers import RotatingFileHandler
 
 
 def die():

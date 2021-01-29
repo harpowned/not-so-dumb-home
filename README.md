@@ -1,8 +1,6 @@
 # Not-so-dumb-home
 Because I wouldn't go as far as to call it smart..
 
-Not-so-dumb-home 2.0 is in development, it's NOT READY!
-
 # Description and features
  Not-so-dumb-home is the core of a small home automation project, with the following features:
  - Automatic control of a thermostat
@@ -20,7 +18,7 @@ Underfloor heating has many advantadges, but quick heating is not one of them. I
 So, my requirements:
  - The actual decision to turn the heater on and off should be done by a real thermostat. We don't want a software failure to cause infinite heating, which can get really expensive really fast.
  - We want to have a nice way to know what's been happening. What's the temperature been, how much time has the heater been on?
- - I prefer wired communications to wireless ones for this purpose. This device is going to spend its whole life (at least a decade, I hope!) hanging on the same wall, so there's no real benefit to wireless communications. Using wireless however, causes security and maintenance headaches. Besides, you need to feed power to it, so you will be running wires to it anyway.
+ - I prefer wired communications to wireless ones for this purpose. This device is going to spend its whole life (at least a decade, I hope!) hanging on the same wall, and I'm going to have to run power to it anyway, so to me, there's no real benefit to wireless communications. Using wireless however, causes security and maintenance headaches. Besides, you need to feed power to it, so you will be running wires to it anyway.
  - Remote control would be nice to have
  - Also, I would like my system to be self-contained, so anything using a remote service is a no-go. Especially if the server is provided "for free" with the purchase of the hardware, as the provider could cease to operate or otherwise break compatiblity and render my existing hardware obsolete. I also discard this option because of privacy concerns.
 
@@ -37,39 +35,28 @@ Thermostat: Siemens RDF302
   - It's very simple to use, looks nice and seems well-built (hope it will last!)
   - It also shows the exterior temperature, if you can feed it from somewhere else
 
-Power Meter: Eastron SDM220
+Power Meter: Eastron SDM220/SDM230
   - It's a din-rail mounted power meter with RS485 communications
   - Uses Modbus RTU, and the manual has the full documentation on how to remotely operate it
   - It was fairly easy to put it into the mains power box
 
-Arduino-based Thermostat/Solar heating controller
-  - I needed to control an installation with a radiator pump, a diesel heater and a solar panel
-  - The systems need to be connected together (radiator pump needs to run whenever solar panel OR diesel heater is on)
-  - I couldn't find a simple solution for this on the market, so I made one using an Arduino controller and a relay board
-
-
-# Status
-Openheat is (currently) a small project I've been using at home for some time. I'm confident it does what it's expected in my scenario, but it's currently not deployable for anyone without some programming expertise.
-
 # Software architecture
-Openheat has 2 parts, the heatingScheduler and the deviceInterface.
-The deviceInterface is meant to run on a small, embedded device (probably with a read-only filesystem) and must be connected to the RS485 bus (and to a network connecting to the heatingScheduler).
-  - The deviceInterface's job is to manage the communication with the modbus devices.
-  - It periodically takes a sample of the data from the devices, and sends data to the datastore (Zabbix)
+The different components mostly communicate via an MQTT broker.
+
+NSDH has the following parts:
+DeviceInterface:
+  - The deviceInterface's job is to manage the communication with the final devices.
+  - It's meant to run on a small, embedded device (probably with a read-only filesystem) and must be connected to the sensors you want to control.
+  - It's the device that is connected to the sensor or sensors, maybe via some non-ethernet network (like RS485)
   - It listens for commands from clients
+  - It periodically sends data to the MQTT topics, so other programs (like Home Assistant) can update their state
+  - There could be more than one instance (on different locations, or connected to different devices)
 
-The heatingScheduler is meant to run on the "main server", where you'll be doing the programming, probably together with other programs and/or frontends for this.
-  - The heatingScheduler is the one who implements the logic of when to change the temperature
-  - It reads the rules from a database (currently mysql)
-  - It sends commands to the client to change the setpoint according to the programming
+LoggingSender:
+  - The LoggingSender's job is to send data to a server, for logging and archival
+  - I'm using Zabbix for this, which provides some nice charts, and allows setting alerts if things go out of hand
+  - It subscribes to the MQTT topics where the DeviceInterfaces post their status
 
-Master and deviceInterface can be run on the same device, if that's what fits your setup. I have the deviceInterface on a separate device, and the heatingScheduler, mysql and zabbix servers all on the same machine.
-
-# Next steps
- - Lots of configuration parameters are hard-coded. This is okay for my own unchanging installation, but config files must be used in order for this to be useful for anyone else.
- - Communications between components are now an ugly command over a tcp port. Make them communicate over mqtt, with ssl and authentication, and choose a nicer (json?) communication method. Maybe something "standard"?
- - Right now, configuring means using phpmyadmin to add orders to the device. Since the tables describe exactly what I want to do, it's not really hard, but a better interface would be nice
- - Instant, remote changes are done right now using ssh and sending commands to the deviceInterface. I certanly need to add a frontend to that
-
-# Other thoughts
- - For power consumption and heater control, this software mostly covers my needs, but it would be nice to have it integrated into something more scalable, which I can easily extend to further add sensors and actuators.
+WeatherNotifier:
+  - This is a simple program which queries an internet service for weather data, an posts it on an MQTT channel
+  - It's meant to provide support to a thermostat which has an outdoor temperature display

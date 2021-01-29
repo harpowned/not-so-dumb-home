@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-import sys
-import logging
-import configparser
 import argparse
+import configparser
 import importlib
-from libs import not_so_dumb_home_utils as utils
+import logging
+import sys
+
 from libs import mqtt_connection as mqtt
-import traceback
+from libs import not_so_dumb_home_utils as utils
+from libs.drivers.modbus import modbusdriver_pymodbus as modbus_driver_lib
 
 APP_NAME = "deviceInterface"
 VERSION = "2.0.0-dev"
@@ -61,6 +62,8 @@ def main(args):
 
     logger.info("Starting SmartHome DeviceInterface %s" % VERSION)
 
+    modbus_driver = modbus_driver_lib.ModbusDriver()
+
     enabled_devices = config["deviceInterface"]["enabled_devices"].replace(" ", "").split(',')
     device_drivers = dict()
     for device_id in enabled_devices:
@@ -73,7 +76,7 @@ def main(args):
             device_drivers[device_driver] = importlib.import_module("libs.drivers." + device_driver)
 
         # Instantiate the device object
-        device = device_drivers[device_driver].Driver(device_id, config[device_id])
+        device = device_drivers[device_driver].Driver(device_id, config[device_id], modbus_driver)
         # Add the object to the running drivers
         devices.append(device)
 

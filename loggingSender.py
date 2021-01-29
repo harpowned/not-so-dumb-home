@@ -1,14 +1,15 @@
 #!/usr/bin/python3
-import logging
-import sys
 import argparse
 import configparser
 import json
-from libs.logging_providers import zabbix_sender as logging_server_lib
-#from libs.logging_providers import dummy_logging_provider as logging_server_lib
-from libs import not_so_dumb_home_utils as utils
-from libs import mqtt_connection as mqtt
+import logging
+import sys
+import datetime
 
+from libs import mqtt_connection as mqtt
+from libs import not_so_dumb_home_utils as utils
+#from libs.logging_providers import dummy_logging_provider as logging_server_lib
+from libs.logging_providers import zabbix_sender as logging_server_lib
 
 APP_NAME = "loggingSender"
 VERSION = "2.0"
@@ -27,6 +28,7 @@ topic_prefix = ""
 
 
 class DeviceLogger:
+
     def __init__(self, device_id, config):
         self.deviceName = device_id
         self.nameInServer = config["nameInServer"]
@@ -34,13 +36,20 @@ class DeviceLogger:
         self.variables = config["variables"].replace(" ", "").split(',')
         component_name = config["component_name"]
         device_topic = "%s/%s/%s/state" % (topic_prefix, component_name, device_id)
+        logger.info("Subscribing to topic: \"%s\"" % device_topic)
+
+        self.time_last_message = datetime.datetime(2000, 1, 1, 0, 0)  # Set a time in the past as initial value
 
         mqtt_conn.subscribe(device_topic, self.on_message)
 
     def on_message(self, client, userdata, message):
-        status_data = json.loads(message.payload)
-        for variable in self.variables:
-            logging_server.push_data(self.nameInServer, variable, status_data[variable])
+        if self.time_last_message + datetime.timedelta(seconds=self.interval) > datetime.datetime.now():
+            logger.debug("Ignoring message received within interval")
+        else:
+            status_data = json.loads(message.payload)
+            for variable in self.variables:
+                logging_server.push_data(self.nameInServer, variable, status_data[variable])
+            self.time_last_message = datetime.datetime.now()
 
 
 def main(args):

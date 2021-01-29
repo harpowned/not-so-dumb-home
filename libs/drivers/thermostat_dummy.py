@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
+import datetime
 import logging
 import threading
 import time
-import datetime
 
 
 class Driver:
     temperature = 22.5
     setpoint = 24.0
     is_on = True
-    sampling_period = 30 # seconds
+    sampling_period = 30  # seconds
 
     def __init__(self, device_id, config):
         self.logger = logging.getLogger("not_so_dumb_home.dummy_thermostat_%s" % device_id)
@@ -79,7 +79,7 @@ class Driver:
             return self.is_on
 
     def get_settable_vars(self):
-        return ["setpoint", "outtemp","is_on"]
+        return ["setpoint", "outtemp", "is_on"]
 
     def set_value(self, key, value):
         if key == "setpoint":
@@ -113,7 +113,6 @@ class Driver:
             else:
                 self.logger.info("Thermostat turning OFF")
                 self.is_on = False
-
 
     def disable_sec_display(self):
         # Set secondary display to nothing

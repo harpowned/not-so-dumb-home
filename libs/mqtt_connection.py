@@ -1,6 +1,8 @@
-import paho.mqtt.client as mqtt
 import logging
 import traceback
+
+import paho.mqtt.client as mqtt
+
 from . import mqtt_adapters as adapters
 
 logger = logging.getLogger("not_so_dumb_home.mqtt_connection")
@@ -57,7 +59,7 @@ class MqttConnection:
             raise ValueError("Error: MQTT port must be a number between 1 and 65535")
 
         self.mqtt_client = mqtt.Client(client_id=instance_name, clean_session=True)
-        self.mqtt_client.enable_logger()
+        self.mqtt_client.enable_logger(logger)
         self.mqtt_client.on_connect = self.on_connect
         self.mqtt_client.on_disconnect = self.on_disconnect
         self.mqtt_client.on_message = self.on_message
@@ -99,6 +101,6 @@ class MqttConnection:
 
     def publish(self, topic, message):
         try:
-            self.mqtt_client.publish(topic, message, qos=1)
+            self.mqtt_client.publish(topic, message, qos=0)
         except:
             print(traceback.format_exc())

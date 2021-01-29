@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 import threading
 import time
 
@@ -36,6 +36,7 @@ class MqttThermostatAdapter:
         except ValueError:
             self.logger.warning("Received unparseable setpoint command")
             pass
+        time.sleep(2)
         self.send_state_msg()
 
     def mode_command(self, client, userdata, message):
@@ -86,8 +87,10 @@ class MqttThermostatAdapter:
     def send_config_message(self):
         self.logger.info("send_config_message")
         device_name = self.device.get_name()
+        device_id = self.device.get_id()
         message = {}
         message["name"] = device_name
+        message["unique_id"] = "%sr" % device_id
 
         # Availability
         # message["availability_topic"] = "%s/available" % self.device_topics_prefix
@@ -114,16 +117,16 @@ class MqttThermostatAdapter:
         message["temperature_command_topic"] = "%s/setpoint" % self.device_topics_prefix
 
         # Other stuff
-        message["min_temp"] = "15"
-        message["max_temp"] = "26"
+        message["min_temp"] = "18"
+        message["max_temp"] = "25"
         message["temp_step"] = "0.5"
 
-        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.logger.info("Sending MQTT config message: \"%s\"" % json.dumps(message))
         self.mqtt_conn.publish("%s/config" % self.device_topics_prefix, json.dumps(message))
 
     def state_message_scheduler(self):
-        # Leave 15 seconds between startup (config message) and the first status message
-        time.sleep(15)
+        # Leave 5 seconds between startup (config message) and the first status message
+        time.sleep(5)
         while True:
             self.send_state_msg()
             time.sleep(self.device.get_sampling_period())
@@ -138,11 +141,15 @@ class MqttThermostatAdapter:
             message["mode"] = "off"
         message["current_temp"] = self.device.get_value("curtemp")
         message["setpoint"] = self.device.get_value("setpoint")
+        # Action is for home-assistant compatiblity
+        # isHeating is for legazy (Zabbix) compatibility
         if self.device.get_value("isheating") == 1:
             message["action"] = "heating"
+            message["isheating"] = 1
         else:
             message["action"] = "off"
-        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+            message["isheating"] = 0
+        self.logger.info("Sending MQTT status message: \"%s\"" % json.dumps(message))
         self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))
 
 
@@ -227,8 +234,8 @@ class MqttPowermeterAdapter:
         self.mqtt_conn.publish("%s_pfactor/config" % self.device_topics_prefix, json.dumps(message))
 
     def state_message_scheduler(self):
-        # Leave 15 seconds between startup (config message) and the first status message
-        time.sleep(15)
+        # Leave 5 seconds between startup (config message) and the first status message
+        time.sleep(5)
         while True:
             self.send_state_msg()
             time.sleep(self.device.get_sampling_period())
@@ -238,7 +245,8 @@ class MqttPowermeterAdapter:
         message = {}
         message["power"] = self.device.get_value("power")
         message["current"] = self.device.get_value("current")
-        message["energy"] = self.device.get_value("totact")
+        message["energy"] = self.device.get_value("acciae")
         message["voltage"] = self.device.get_value("volt")
         message["power_factor"] = self.device.get_value("pfactor")
+        message["maxpower"] = self.device.get_value("maxpower")
         self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))

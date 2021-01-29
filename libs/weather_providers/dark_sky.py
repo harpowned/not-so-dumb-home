@@ -1,7 +1,7 @@
-import logging
-import urllib.request
-import traceback
 import json
+import logging
+import traceback
+import urllib.request
 
 
 class WeatherProvider:
