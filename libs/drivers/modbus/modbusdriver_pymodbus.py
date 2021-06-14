@@ -18,7 +18,7 @@ class ModbusDriver:
     def modbus_read_float(self, device, address):
         self.logger.debug("Acquiring mutex for query to %s" % address)
         self.mutex.acquire()
-        time.sleep(0.05)
+        time.sleep(0.15)
         result = None
         self.logger.debug("Acquired mutex for query to %s" % address)
         try:
@@ -39,7 +39,7 @@ class ModbusDriver:
         self.logger.debug("Acquiring mutex for query to %s" % address)
         self.mutex.acquire()
         result = None
-        time.sleep(0.05)
+        time.sleep(0.15)
         self.logger.debug("Acquired mutex for query to %s" % address)
         try:
             response = self.serialclient.read_input_registers(address, 1, unit=device)
@@ -56,7 +56,7 @@ class ModbusDriver:
         self.logger.debug("Acquiring mutex for query to %s" % address)
         self.mutex.acquire()
         result = None
-        time.sleep(0.05)
+        time.sleep(0.15)
         self.logger.debug("Acquired mutex for query to %s" % address)
         try:
             result = self.serialclient.write_register(address, value, unit=device)
