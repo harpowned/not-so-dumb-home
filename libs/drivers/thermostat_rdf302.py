@@ -6,6 +6,24 @@ import time
 
 class Driver:
     sampling_period = 15
+    off_temperature = 18
+
+    # A note on turning the thermostat on/off:
+    #   When the thermostat is put into protection mode via modbus, it's not possible to turn it on again (comfort) via
+    #   HMI.
+    #   So let's disable the command, unless we find a solution.
+    #
+    #   However, because of the way the Home Assistant integration works, we still need to be able to turn the
+    #   thermostat on/off via a command.
+    #   The trick we'll do is that any temperature at or below 18ºC is considered OFF.
+    #   So, sending the command to turn the thermostat OFF will not put it into protection mode, but will set the
+    #   temperature a configurable temperature temp_low, which must be below 18, effectively turning it off.
+    #
+    #   When the command to turn on is received, the Modbus thermostat has no way to remember at which temperature
+    #   the setpoint was before it was turned off, so we'll have to use a configurable temp_high value.
+    #
+    #   Both temp_high and temp_low are configurable (and should be adjustable from the interface), and it's this
+    #   module's responsibility to persist that configuration across reboots.
 
     def __init__(self, device_id, config, modbus_driver):
         self.logger = logging.getLogger("not_so_dumb_home.dummy_thermostat_%s" % device_id)
@@ -15,6 +33,13 @@ class Driver:
 
         self.device_name = config["name"]
         self.outdoor_temp_topic = config["outdoor_temp_topic"]
+
+        self.use_ghost_thermostat = config["use_ghost_thermostat"]
+        self.temp_high = 0
+        self.temp_low = 0
+        if self.use_ghost_thermostat:
+            self.persistence_file = config["persistence_file"]
+            self.load_persistence_file()
 
         address = config["modbus-address"]
         self.logger.debug("Setting RDF302 modbus address %s" % address)
@@ -31,10 +56,30 @@ class Driver:
         t.setDaemon(True)
         t.start()
 
+    def using_ghost_thermostat(self):
+        return self.use_ghost_thermostat
+
+    def load_persistence_file(self):
+        self.logger.info("Loading persistance file")
+        with open(self.persistence_file) as pf:
+            line1 = pf.readline()
+            line2 = pf.readline()
+            temp_high = float(line1)
+            self.logger.info("Loaded high temp: %s" % temp_high)
+            temp_low = float(line2)
+            self.logger.info("Loaded low temp: %s" % temp_low)
+            self.temp_high = temp_high
+            self.temp_low = temp_low
+
+    def save_persistence_file(self):
+        with open(self.persistence_file, 'w') as pf:
+            pf.write("%s\n" % self.temp_high)
+            pf.write("%s\n" % self.temp_low)
+
     def out_temp_expiration(self):
         while True:
             # if secondDisplayTimeSet + secondDisplayTimeout is older than now, return true
-            if (self.outTempActive) and (
+            if self.outTempActive and (
                     self.outTempTimeSet + datetime.timedelta(minutes=self.outTempTimeout) < datetime.datetime.now()):
                 self.logger.info(
                     "Timeout is expired (set on %s, now is %s)" % (self.outTempTimeSet, datetime.datetime.now()))
@@ -57,7 +102,7 @@ class Driver:
         return self.outdoor_temp_topic
 
     def get_gettable_vars(self):
-        return ["curtemp", "setpoint", "isheating", "is_on"]
+        return ["curtemp", "setpoint", "isheating", "is_on", "temp_low", "temp_high"]
 
     def get_value(self, key):
         if key == "curtemp":
@@ -70,6 +115,10 @@ class Driver:
             temperature = self.rdf302_read_temp(1003)
             self.logger.info("Current setpoint: %s C" % temperature)
             return temperature
+        elif key == "temp_high":
+            return self.temp_high
+        elif key == "temp_low":
+            return self.temp_low
         elif key == "isheating":
             # Heating output - addr 31005 - cmd 0x04
             is_heating = self.rdf302_read_bool(1004)
@@ -79,9 +128,12 @@ class Driver:
             else:
                 return 0
         elif key == "is_on":
-            is_on = self.rdf302_read_int(1000)
+            # We consider ON if the setpoint is above the OFF temperature. Don't use protection mode.
+            # is_on = self.rdf302_read_int(1000)
+            setpoint = float(self.rdf302_read_temp(1003))
+            is_on = setpoint >= self.off_temperature
             self.logger.info("Is on: %s" % is_on)
-            return is_on == 1
+            return is_on
 
     def get_settable_vars(self):
         return ["setpoint", "outtemp", "is_on"]
@@ -109,14 +161,21 @@ class Driver:
                 value = 49
             # Set displayed outdoor temp - addr 40104
             self.rdf302_write_temp(103, value)
-        # When the thermostat is put into protection mode via modbus,
-        # it's not possible to turn it on again (comfort) via HMI.
-        # So let's disable the command, unless we find a solution.
-        elif key == "is_on" and False:
+        elif key == "temp_high" and self.use_ghost_thermostat:
+            temp_high = float(value)
+            self.temp_high = temp_high
+            self.save_persistence_file()
+        elif key == "temp_low" and self.use_ghost_thermostat:
+            temp_low = float(value)
+            self.temp_low = temp_low
+            self.save_persistence_file()
+        elif key == "is_on":
             if value:
-                self.rdf302_write_int(100, 1)
+                # self.rdf302_write_int(100, 1)
+                self.set_value("setpoint", self.temp_high)
             else:
-                self.rdf302_write_int(100, 4)
+                # self.rdf302_write_int(100, 4)
+                self.set_value("setpoint", self.temp_low)
 
     def rdf302_read_temp(self, data_address):
         result = round(int(self.modbus_driver.modbus_read_input(self.address, data_address)) / float(50), 2)

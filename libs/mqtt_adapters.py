@@ -16,10 +16,15 @@ class MqttThermostatAdapter:
         device_id = device.get_id()
         self.device_topics_prefix = "%s/climate/%s" % (topic_prefix, device_id)
 
+        self.use_ghost_thermostat =  self.device.using_ghost_thermostat()
+
         # Subscribe to the command topics
         self.mqtt_conn.subscribe("%s/setpoint" % self.device_topics_prefix, self.setpoint_command)
         self.mqtt_conn.subscribe("%s/mode" % self.device_topics_prefix, self.mode_command)
         self.mqtt_conn.subscribe(device.get_outdoor_temp_topic(), self.set_outdoor_temp_command)
+        if self.use_ghost_thermostat:
+            self.mqtt_conn.subscribe("%s_ghost/temp_high" % self.device_topics_prefix, self.temp_high_command)
+            self.mqtt_conn.subscribe("%s_ghost/temp_low" % self.device_topics_prefix, self.temp_low_command)
 
         # Launch the periodic message threads
         config_msg_thread = threading.Thread(target=self.config_message_scheduler, args=())
@@ -49,6 +54,31 @@ class MqttThermostatAdapter:
             self.device.set_value("is_on", True)
         else:
             self.logger.warning("Received incorrect mode command")
+        time.sleep(2)
+        self.send_state_msg()
+
+    def temp_high_command(self, client, userdata, message):
+        self.logger.info("Received temp_high command")
+        self.logger.debug("Message is: \"%s\"" % message.payload)
+        try:
+            new_temp_high = float(message.payload)
+            self.device.set_value("temp_high", new_temp_high)
+        except ValueError:
+            self.logger.warning("Received unparseable temp_high command")
+            pass
+        time.sleep(2)
+        self.send_state_msg()
+
+    def temp_low_command(self, client, userdata, message):
+        self.logger.info("Received temp_low command")
+        self.logger.debug("Message is: \"%s\"" % message.payload)
+        try:
+            new_temp_low = float(message.payload)
+            self.device.set_value("temp_low", new_temp_low)
+        except ValueError:
+            self.logger.warning("Received unparseable temp_low command")
+            pass
+        time.sleep(2)
         self.send_state_msg()
 
     def set_outdoor_temp_command(self, client, userdata, message):
@@ -90,7 +120,7 @@ class MqttThermostatAdapter:
         device_id = self.device.get_id()
         message = {}
         message["name"] = device_name
-        message["unique_id"] = "%sr" % device_id
+        message["unique_id"] = "%s" % device_id
 
         # Availability
         # message["availability_topic"] = "%s/available" % self.device_topics_prefix
@@ -124,6 +154,32 @@ class MqttThermostatAdapter:
         self.logger.info("Sending MQTT config message: \"%s\"" % json.dumps(message))
         self.mqtt_conn.publish("%s/config" % self.device_topics_prefix, json.dumps(message))
 
+        if self.use_ghost_thermostat:
+            message = {}
+            message["name"] = "%s_ghost" % device_name
+            message["unique_id"] = "%s_ghost" % device_id
+            message["temp_step"] = "0.5"
+
+            message["mode_state_template"] = "{{value_json.mode}}"
+            message["modes"] = ["off"]
+            message["mode_command_topic"] = "%s_ghost/mode" % self.device_topics_prefix
+            message["mode_state_topic"] = "%s_ghost/state" % self.device_topics_prefix
+            message["current_temperature_topic"] = "%s_ghost/state" % self.device_topics_prefix
+            message["current_temperature_template"] = "{{value_json.current_temp}}"
+
+            # Temperature high (setpoint when an ON command is received)
+            message["temperature_high_state_topic"] = "%s_ghost/state" % self.device_topics_prefix
+            message["temperature_high_state_template"] = "{{value_json.temp_high}}"
+            message["temperature_high_command_topic"] = "%s_ghost/temp_high" % self.device_topics_prefix
+
+            # Temperature low (setpoint when an OFF command is received)
+            message["temperature_low_state_topic"] = "%s_ghost/state" % self.device_topics_prefix
+            message["temperature_low_state_template"] = "{{value_json.temp_low}}"
+            message["temperature_low_command_topic"] = "%s_ghost/temp_low" % self.device_topics_prefix
+
+            self.logger.info("Sending MQTT config message: \"%s\"" % json.dumps(message))
+            self.mqtt_conn.publish("%s_ghost/config" % self.device_topics_prefix, json.dumps(message))
+
     def state_message_scheduler(self):
         # Leave 5 seconds between startup (config message) and the first status message
         time.sleep(5)
@@ -151,6 +207,15 @@ class MqttThermostatAdapter:
             message["isheating"] = 0
         self.logger.info("Sending MQTT status message: \"%s\"" % json.dumps(message))
         self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))
+
+        if self.use_ghost_thermostat:
+            message = {}
+            message["mode"] = "off"
+            message["current_temp"] = 0
+            message["temp_high"] = self.device.get_value("temp_high")
+            message["temp_low"] = self.device.get_value("temp_low")
+            self.logger.info("Sending MQTT status message: \"%s\"" % json.dumps(message))
+            self.mqtt_conn.publish("%s_ghost/state" % self.device_topics_prefix, json.dumps(message))
 
 
 class MqttPowermeterAdapter:
