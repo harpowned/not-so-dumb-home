@@ -60,3 +60,7 @@ LoggingSender:
 WeatherNotifier:
   - This is a simple program which queries an internet service for weather data, an posts it on an MQTT channel
   - It's meant to provide support to a thermostat which has an outdoor temperature display
+
+# Scheduling
+In NSDH v1.0, there was an additional component, a scheduler.
+Since we now have Home Assistant integration, and there are nicer schedulers that integrate into it, that component is no longer needed.
