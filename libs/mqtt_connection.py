@@ -96,6 +96,9 @@ class MqttConnection:
         elif device_type == "powermeter":
             logger.info("Registering new power meter")
             return adapters.MqttPowermeterAdapter(self, device)
+        elif device_type == "gasoilmeter":
+            logger.info("Registering new gasoil meter")
+            return adapters.MqttGasoilmeterAdapter(self, device)
         else:
             raise ValueError("Unknown device type: %s" % device_type)
 

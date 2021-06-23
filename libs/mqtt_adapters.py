@@ -315,3 +315,86 @@ class MqttPowermeterAdapter:
         message["power_factor"] = self.device.get_value("pfactor")
         message["maxpower"] = self.device.get_value("maxpower")
         self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))
+
+class MqttGasoilmeterAdapter:
+    def __init__(self, mqtt_conn, device):
+        self.logger = logging.getLogger("not_so_dumb_home.mqtt_gasoilmeter_adapter_%s" % device.get_name())
+        self.device = device
+        self.mqtt_conn = mqtt_conn
+        topic_prefix = mqtt_conn.get_topic_prefix()
+        device_id = device.get_id()
+        self.device_topics_prefix = "%s/sensor/%s" % (topic_prefix, device_id)
+
+        # Launch the periodic message threads
+        config_msg_thread = threading.Thread(target=self.config_message_scheduler, args=())
+        state_msg_thread = threading.Thread(target=self.state_message_scheduler, args=())
+        config_msg_thread.start()
+        state_msg_thread.start()
+
+    def config_message_scheduler(self):
+        while True:
+            self.send_config_message()
+            time.sleep(config_messages_period_seconds)
+
+    def send_config_message(self):
+        self.logger.info("send_config_message")
+        device_name = self.device.get_name()
+        device_id = self.device.get_id()
+
+        # Level
+        message = {}
+        message["name"] = "%s - Level" % device_name
+        message["unique_id"] = "%s_level" % device_id
+        # There is no device class for measuring liters
+        # (https://www.home-assistant.io/integrations/sensor/#device-class)
+        # so let's just remove his value and leave it as default "Generic sensor"
+        #message["device_class"] = ""
+        message["state_topic"] = "%s/state" % self.device_topics_prefix
+        message["value_template"] = "{{value_json.level}}"
+        message["unit_of_measurement"] = "L"
+        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.mqtt_conn.publish("%s_level/config" % self.device_topics_prefix, json.dumps(message))
+
+        # Percentage
+        message = {}
+        message["name"] = "%s - Percentage" % device_name
+        message["unique_id"] = "%s_percentage" % device_id
+        # There is no device class for measuring liters
+        # (https://www.home-assistant.io/integrations/sensor/#device-class)
+        # so let's just remove his value and leave it as default "Generic sensor"
+        #message["device_class"] = ""
+        message["state_topic"] = "%s/state" % self.device_topics_prefix
+        message["value_template"] = "{{value_json.percentage}}"
+        message["unit_of_measurement"] = "%"
+        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.mqtt_conn.publish("%s_percentage/config" % self.device_topics_prefix, json.dumps(message))
+
+        # Capacity
+        message = {}
+        message["name"] = "%s - Capacity" % device_name
+        message["unique_id"] = "%s_capacity" % device_id
+        # There is no device class for measuring liters
+        # (https://www.home-assistant.io/integrations/sensor/#device-class)
+        # so let's just remove his value and leave it as default "Generic sensor"
+        # message["device_class"] = ""
+        message["state_topic"] = "%s/state" % self.device_topics_prefix
+        message["value_template"] = "{{value_json.capacity}}"
+        message["unit_of_measurement"] = "L"
+        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.mqtt_conn.publish("%s_capacity/config" % self.device_topics_prefix, json.dumps(message))
+
+
+    def state_message_scheduler(self):
+        # Leave 5 seconds between startup (config message) and the first status message
+        time.sleep(5)
+        while True:
+            self.send_state_msg()
+            time.sleep(self.device.get_sampling_period())
+
+    def send_state_msg(self):
+        self.logger.info("send_state_message")
+        message = {}
+        message["level"] = self.device.get_value("level")
+        message["percentage"] = self.device.get_value("percentage")
+        message["capacity"] = self.device.get_value("capacity")
+        self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))

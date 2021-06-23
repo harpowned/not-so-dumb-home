@@ -1,5 +1,8 @@
 import logging
 
+def is_modbus():
+    return True
+
 class Driver:
     sampling_period = 5  # seconds
 

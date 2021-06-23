@@ -8,9 +8,9 @@ from pymodbus.exceptions import ModbusIOException
 
 
 class ModbusDriver:
-    def __init__(self):
+    def __init__(self, modbus_port):
         self.logger = logging.getLogger("not_so_dumb_home.modbusdriver_pymodbus")
-        self.serialclient = ModbusClient(method='rtu', port='/dev/rs485', timeout=0.125, baudrate=9600,
+        self.serialclient = ModbusClient(method='rtu', port=modbus_port, timeout=0.125, baudrate=9600,
                                          parity=serial.PARITY_EVEN)
         self.serialclient.connect()
         self.mutex = threading.Lock()
