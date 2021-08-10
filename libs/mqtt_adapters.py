@@ -391,10 +391,14 @@ class MqttGasoilmeterAdapter:
             self.send_state_msg()
             time.sleep(self.device.get_sampling_period())
 
+
     def send_state_msg(self):
         self.logger.info("send_state_message")
         message = {}
-        message["level"] = self.device.get_value("level")
-        message["percentage"] = self.device.get_value("percentage")
-        message["capacity"] = self.device.get_value("capacity")
-        self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))
+        try:
+            message["level"] = self.device.get_value("level")
+            message["percentage"] = self.device.get_value("percentage")
+            message["capacity"] = self.device.get_value("capacity")
+            self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))
+        except ValueError:
+            self.logger.warning("Exception raised during state message processing")

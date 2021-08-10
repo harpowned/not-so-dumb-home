@@ -4,6 +4,7 @@ import threading
 import serial
 from array import *
 import numpy
+import os
 
 def is_modbus():
     return False
@@ -13,6 +14,7 @@ class Driver:
     min_reading = 50 # 5 cm
     max_reading = 1500 # 150 cm
     max_queue = 30
+    timeout = 60
 
     def __init__(self, device_id, config):
         self.logger = logging.getLogger("not_so_dumb_home.gasoilmeter%s" % device_id)
@@ -29,8 +31,25 @@ class Driver:
         serial_thread = threading.Thread(target=self._serial_thread)
         serial_thread.start()
 
+    def _watchdog_action(self):
+        self.logger.error("No readings for %s seconds. Watchdog action." % self.timeout)
+        os._exit(1)
+
+    def _set_watchdog(self):
+        self.logger.debug("Watchdog set")
+        self.watchdog_timer = threading.Timer(self.timeout, self._watchdog_action)
+        self.watchdog_timer.start()
+
+    def _kick_watchdog(self):
+        self.logger.debug("Kicking watchdog")
+        self.watchdog_timer.cancel()
+        self.watchdog_timer = threading.Timer(self.timeout, self._watchdog_action)
+        self.watchdog_timer.start()
+
+
     def _serial_thread(self):
         ser = serial.Serial(self.serial_port, 9600)
+        self._set_watchdog()
 
         while True:
             line = ser.readline()
@@ -38,6 +57,7 @@ class Driver:
             int_line = int(line)
             if self.min_reading < int_line < self.max_reading:
                 self.readings_queue.append(int_line)
+                self._kick_watchdog()
             else:
                 self.logger.warning("Received out of range reading from sensor: %s" % int_line)
             while len(self.readings_queue)>self.max_queue:
@@ -48,18 +68,23 @@ class Driver:
 
     def _get_liters(self):
         reading = self._get_distance()
-        range = self.distance_empty - self.distance_full
-        distance_per_liter = self.capacity / range
+        r_range = self.distance_empty - self.distance_full
+        distance_per_liter = self.capacity / r_range
         corrected_reading = reading - self.distance_full
+        self.logger.debug("Reading is %s, range is %s, distance per liter is %s, corrected reading is %s" % (reading, r_range, distance_per_liter, corrected_reading))
         # If we are reading fuller than full, return full and issue a warning
         if corrected_reading < self.distance_full:
-            self.logger.warning("Sensor is reporting fuller than full")
-            corrected_reading = self.distance_full
+            self.logger.warning("Sensor is reporting fuller than full (reading is %s, full is %s)" % (corrected_reading, self.distance_full))
+#            corrected_reading = 0
+            raise ValueError
         # If we are reading emptier than empty, return empty and issue a warning
-        if corrected_reading > self.distance_empty:
-            corrected_reading = self.distance_empty
-            self.logger.warning("Sensor is reporting emptier than empty")
-        liters = self.capacity-(corrected_reading * distance_per_liter)
+        elif corrected_reading > self.distance_empty:
+            self.logger.warning("Sensor is reporting emptier than empty (reading is %s, empty is %s)" % (corrected_reading, self.distance_empty))
+#           corrected_reading = r_range
+            raise ValueError
+        else:
+            liters = self.capacity-(corrected_reading * distance_per_liter)
+        self.logger.debug("Reading OK: %s L" % liters)
         return liters
 
 
