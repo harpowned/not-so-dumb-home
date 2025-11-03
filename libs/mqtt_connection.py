@@ -25,7 +25,7 @@ class MqttConnection:
         logger.debug("On connect finished")
 
     def on_disconnect(self, mqttClient, userdata, rc):
-        logger.info("Disconnected from MQTT server")
+        logger.error("Disconnected from MQTT server")
 
     def on_message(self, mqttClient, userdata, msg):
         logger.debug("On Message")
@@ -106,8 +106,10 @@ class MqttConnection:
             raise ValueError("Unknown device type: %s" % device_type)
 
     def publish(self, topic, message):
+        logger.debug("Acquiring lock for publishing to \"%s\"" % topic)
         with mutex:
             try:
                 self.mqtt_client.publish(topic, message, qos=0)
             except:
                 print(traceback.format_exc())
+        logger.debug("Releasing lock for publishing to \"%s\"" % topic)

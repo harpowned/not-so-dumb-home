@@ -38,12 +38,12 @@ class MqttThermostatAdapter:
         self.logger.debug("Message is: \"%s\"" % message.payload)
         try:
             new_setpoint = float(message.payload)
+            self.logger.info("Setting estpoint to \"%s\"" % new_setpoint)
             self.device.set_value("setpoint", new_setpoint)
+            self.logger.info("Done setting setpoint")
         except ValueError:
             self.logger.warning("Received unparseable setpoint command")
             pass
-        time.sleep(2)
-        self.send_state_msg()
 
     def mode_command(self, client, userdata, message):
         self.logger.info("Received mode command")
