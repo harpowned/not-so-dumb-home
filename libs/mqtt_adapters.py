@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 import time
+from random import randrange
 
 config_messages_period_seconds = 60
 
@@ -120,7 +121,7 @@ class MqttThermostatAdapter:
         device_id = self.device.get_id()
         message = {}
         message["name"] = device_name
-        message["unique_id"] = "%sr" % device_id
+        message["unique_id"] = "%s" % device_id
 
         # Availability
         # message["availability_topic"] = "%s/available" % self.device_topics_prefix
@@ -181,8 +182,11 @@ class MqttThermostatAdapter:
             self.mqtt_conn.publish("%s_ghost/config" % self.device_topics_prefix, json.dumps(message))
 
     def state_message_scheduler(self):
-        # Leave 5 seconds between startup (config message) and the first status message
-        time.sleep(5)
+        # Leave a random time between 5 and 60 seconds between startup (config message) and the first status message
+        # This is to make different adapters pick different times
+        random_backoff = randrange(55)+5
+        self.logger.info("%s: Delaying message scheduler startup by %d seconds" % (self.device.get_name(),random_backoff))
+        time.sleep(random_backoff)
         while True:
             self.send_state_msg()
             time.sleep(self.device.get_sampling_period())
@@ -299,8 +303,11 @@ class MqttPowermeterAdapter:
         self.mqtt_conn.publish("%s_pfactor/config" % self.device_topics_prefix, json.dumps(message))
 
     def state_message_scheduler(self):
-        # Leave 5 seconds between startup (config message) and the first status message
-        time.sleep(5)
+        # Leave a random time between 5 and 60 seconds between startup (config message) and the first status message
+        # This is to make different adapters pick different times
+        random_backoff = randrange(55)+5
+        self.logger.info("%s: Delaying message scheduler startup by %d seconds" % (self.device.get_name(),random_backoff))
+        time.sleep(random_backoff)
         while True:
             self.send_state_msg()
             time.sleep(self.device.get_sampling_period())
