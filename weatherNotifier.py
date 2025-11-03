@@ -56,8 +56,11 @@ def weatherinfo_scheduler():
             # Send a report with only the temperature
             if mqtt_topic_temperature:
                 temp = weather_provider.get_current_temp()
-                logger.info("Posting to mqtt: %s" % temp)
-                mqtt_conn.publish(mqtt_topic_temperature, temp)
+                for topic in mqtt_topic_temperature.split(','):
+                    logger.info("Posting to mqtt: Topic: %s, message:  %s" % (topic, temp))
+                    mqtt_conn.publish(topic, temp)
+            else:
+                logger.info("No mqtt temperature topic")
         else:
             logger.warning("Could not update weather info")
 
@@ -94,9 +97,12 @@ def main(args):
     logger.info("Starting SmartHome weatherNotifier %s" % VERSION)
 
     weather_type = config["weatherNotifier"]["weatherService"]
-    if weather_type == "darksky":
-        from libs.weather_providers import dark_sky as weather_provider_lib
-        weather_provider = weather_provider_lib.WeatherProvider(config["darksky"])
+    if weather_type == "openweathermap":
+        from libs.weather_providers import openweathermap as weather_provider_lib
+        weather_provider = weather_provider_lib.WeatherProvider(config["openweathermap"])
+    elif weather_type == "meteocat":
+        from libs.weather_providers import meteocat as weather_provider_lib
+        weather_provider = weather_provider_lib.WeatherProvider(config["meteocat"])
 
     weather_conf = config["weatherNotifier"]
     weather_provider.set_position(weather_conf["latitude"], weather_conf["longitude"])

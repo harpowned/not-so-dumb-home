@@ -5,7 +5,7 @@ import urllib.request
 
 
 class WeatherProvider:
-    logger = logging.getLogger("smarthome.darkSkyLogger")
+    logger = logging.getLogger("smarthome.openWeatherMapLogger")
 
     apikey = 0
     latitude = 0
@@ -19,9 +19,9 @@ class WeatherProvider:
     weather_text = ""
 
     def __init__(self, config):
-        self.logger = logging.getLogger("not_so_dumb_home.weather_provider_darksky")
+        self.logger = logging.getLogger("not_so_dumb_home.weather_provider_openweathermap")
         apikey = config["apikey"]
-        self.logger.debug("Setting Dark Sky api key to %s" % apikey)
+        self.logger.debug("Setting OpenWeatherMap api key to %s" % apikey)
         self.apikey = apikey
 
     def set_position(self, lat, lon):
@@ -31,16 +31,17 @@ class WeatherProvider:
 
     def update_data(self):
         try:
-            url = "https://api.darksky.net/forecast/%s/%s,%s?units=si" % (self.apikey, self.latitude, self.longitude)
+            url = "https://api.openweathermap.org/data/2.5/weather?lat=%s&lon=%s&appid=%s&units=metric&lang=ca" % (self.latitude, self.longitude, self.apikey)
+            self.logger.debug("Calling URL: %s" % url)
             response = urllib.request.urlopen(url).read()
-            self.logger.debug("DarkSky http get: %s" % response)
+            self.logger.debug("OpenWeatherMap http get: %s" % response)
             data = json.loads(response)
-            self.current_temp = data["currently"]["temperature"]
-            self.current_hum = data["currently"]["humidity"]
-            self.current_press = data["currently"]["pressure"]
-            self.current_wind_speed = data["currently"]["windSpeed"]
-            self.weather_icon = data["currently"]["icon"]
-            self.weather_text = data["hourly"]["summary"]
+            self.current_temp = data["main"]["temp"]
+            self.current_hum = data["main"]["humidity"]
+            self.current_press = data["main"]["pressure"]
+            self.current_wind_speed = data["wind"]["speed"]
+            self.weather_icon = data["weather"][0]["main"]
+            self.weather_text = data["weather"][0]["description"]
             return True
         except:
             traceback.print_exc()
