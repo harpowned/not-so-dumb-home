@@ -22,7 +22,7 @@ def init_log(app_name, path, verbose):
         raise LogPathNotFoundException
 
     global_logger = logging.getLogger()
-    global_logger.setLevel(logging.DEBUG)
+    global_logger.setLevel(logging.INFO)
 
     # add a rotating handler
     file_handler = RotatingFileHandler(path, maxBytes=10 * 1024 * 1024, backupCount=5)
