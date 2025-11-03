@@ -107,11 +107,13 @@ class Driver:
     def get_value(self, key):
         if key == "curtemp":
             # Current Temp - addr 31003 - cmd 0x04
+            self.logger.debug("Reading current temperature")
             temperature = self.rdf302_read_temp(1002)
             self.logger.info("Current temperature: %s C" % temperature)
             return temperature
         elif key == "setpoint":
             # Current set point - addr 31004 - cmd 0x04
+            self.logger.debug("Reading setpoint")
             temperature = self.rdf302_read_temp(1003)
             self.logger.info("Current setpoint: %s C" % temperature)
             return temperature
@@ -121,6 +123,7 @@ class Driver:
             return self.temp_low
         elif key == "isheating":
             # Heating output - addr 31005 - cmd 0x04
+            self.logger.debug("Reading is heating")
             is_heating = self.rdf302_read_bool(1004)
             self.logger.info("Is heating: %s" % is_heating)
             if is_heating:
