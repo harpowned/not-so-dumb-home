@@ -152,7 +152,7 @@ class MqttThermostatAdapter:
         message["max_temp"] = "25"
         message["temp_step"] = "0.5"
 
-        self.logger.info("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.logger.info("Sending MQTT config (thermostat): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
         self.mqtt_conn.publish("%s/config" % self.device_topics_prefix, json.dumps(message))
 
         if self.use_ghost_thermostat:
@@ -178,7 +178,7 @@ class MqttThermostatAdapter:
             message["temperature_low_state_template"] = "{{value_json.temp_low}}"
             message["temperature_low_command_topic"] = "%s_ghost/temp_low" % self.device_topics_prefix
 
-            self.logger.info("Sending MQTT config message: \"%s\"" % json.dumps(message))
+            self.logger.info("Sending MQTT config (ghost th): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
             self.mqtt_conn.publish("%s_ghost/config" % self.device_topics_prefix, json.dumps(message))
 
     def state_message_scheduler(self):
@@ -209,7 +209,7 @@ class MqttThermostatAdapter:
         else:
             message["action"] = "off"
             message["isheating"] = 0
-        self.logger.info("Sending MQTT status message: \"%s\"" % json.dumps(message))
+        self.logger.info("Sending MQTT status (thermostat): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
         self.mqtt_conn.publish("%s/state" % self.device_topics_prefix, json.dumps(message))
 
         if self.use_ghost_thermostat:
@@ -218,7 +218,7 @@ class MqttThermostatAdapter:
             message["current_temp"] = 0
             message["temp_high"] = self.device.get_value("temp_high")
             message["temp_low"] = self.device.get_value("temp_low")
-            self.logger.info("Sending MQTT status message: \"%s\"" % json.dumps(message))
+            self.logger.info("Sending MQTT status (ghost th): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
             self.mqtt_conn.publish("%s_ghost/state" % self.device_topics_prefix, json.dumps(message))
 
 
@@ -254,7 +254,7 @@ class MqttPowermeterAdapter:
         message["state_topic"] = "%s/state" % self.device_topics_prefix
         message["value_template"] = "{{value_json.power}}"
         message["unit_of_measurement"] = "W"
-        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.logger.info("Sending MQTT config (powermeter-power): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
         self.mqtt_conn.publish("%s_power/config" % self.device_topics_prefix, json.dumps(message))
 
         # Current
@@ -265,7 +265,7 @@ class MqttPowermeterAdapter:
         message["state_topic"] = "%s/state" % self.device_topics_prefix
         message["value_template"] = "{{value_json.current}}"
         message["unit_of_measurement"] = "A"
-        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.logger.info("Sending MQTT config (powermeter-current): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
         self.mqtt_conn.publish("%s_current/config" % self.device_topics_prefix, json.dumps(message))
 
         # Energy
@@ -276,7 +276,7 @@ class MqttPowermeterAdapter:
         message["state_topic"] = "%s/state" % self.device_topics_prefix
         message["value_template"] = "{{value_json.energy}}"
         message["unit_of_measurement"] = "Wh"
-        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.logger.info("Sending MQTT config (powermeter-energy): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
         self.mqtt_conn.publish("%s_energy/config" % self.device_topics_prefix, json.dumps(message))
 
         # Voltage
@@ -287,7 +287,7 @@ class MqttPowermeterAdapter:
         message["state_topic"] = "%s/state" % self.device_topics_prefix
         message["value_template"] = "{{value_json.voltage}}"
         message["unit_of_measurement"] = "V"
-        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
+        self.logger.info("Sending MQTT config (powermeter-voltage): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
         self.mqtt_conn.publish("%s_voltage/config" % self.device_topics_prefix, json.dumps(message))
 
         # Power factor
@@ -298,8 +298,7 @@ class MqttPowermeterAdapter:
         message["state_topic"] = "%s/state" % self.device_topics_prefix
         message["value_template"] = "{{value_json.power_factor}}"
         message["unit_of_measurement"] = "%"
-        self.logger.debug("Sending MQTT config message: \"%s\"" % json.dumps(message))
-        self.logger.debug("Topic is: \"%s\"" % "%s_pfactor/config" % self.device_topics_prefix)
+        self.logger.info("Sending MQTT config (powermeter-pfactor): Topic: \"%s\", Message:\"%s\"" % (self.device_topics_prefix, json.dumps(message)))
         self.mqtt_conn.publish("%s_pfactor/config" % self.device_topics_prefix, json.dumps(message))
 
     def state_message_scheduler(self):
