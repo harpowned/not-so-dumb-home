@@ -1,11 +1,14 @@
 import logging
 import traceback
+from threading import Lock
 
 import paho.mqtt.client as mqtt
 
 from . import mqtt_adapters as adapters
 
 logger = logging.getLogger("not_so_dumb_home.mqtt_connection")
+
+mutex = Lock()
 
 
 class MqttConnection:
@@ -103,7 +106,8 @@ class MqttConnection:
             raise ValueError("Unknown device type: %s" % device_type)
 
     def publish(self, topic, message):
-        try:
-            self.mqtt_client.publish(topic, message, qos=0)
-        except:
-            print(traceback.format_exc())
+        with mutex:
+            try:
+                self.mqtt_client.publish(topic, message, qos=0)
+            except:
+                print(traceback.format_exc())
