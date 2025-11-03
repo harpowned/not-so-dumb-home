@@ -10,7 +10,7 @@ from libs import not_so_dumb_home_utils as utils
 from libs.drivers.modbus import modbusdriver_pymodbus as modbus_driver_lib
 
 APP_NAME = "deviceInterface"
-VERSION = "2.0.0-dev"
+VERSION = "2.1.0"
 
 def_config_paths = [
     "/etc/smarthome/deviceInterface.cfg",
@@ -62,7 +62,10 @@ def main(args):
 
     logger.info("Starting SmartHome DeviceInterface %s" % VERSION)
 
-    modbus_driver = modbus_driver_lib.ModbusDriver()
+    modbus_port = config["modbus"]["port"]
+    modbus_driver = None
+    if modbus_port != "disabled":
+        modbus_driver = modbus_driver_lib.ModbusDriver(modbus_port)
 
     enabled_devices = config["deviceInterface"]["enabled_devices"].replace(" ", "").split(',')
     device_drivers = dict()
@@ -76,7 +79,10 @@ def main(args):
             device_drivers[device_driver] = importlib.import_module("libs.drivers." + device_driver)
 
         # Instantiate the device object
-        device = device_drivers[device_driver].Driver(device_id, config[device_id], modbus_driver)
+        if device_drivers[device_driver].is_modbus():
+             device = device_drivers[device_driver].Driver(device_id, config[device_id], modbus_driver)
+        else:
+            device = device_drivers[device_driver].Driver(device_id, config[device_id])
         # Add the object to the running drivers
         devices.append(device)
 

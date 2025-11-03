@@ -3,6 +3,8 @@ import logging
 import threading
 import time
 
+def is_modbus():
+    return True
 
 class Driver:
     sampling_period = 15

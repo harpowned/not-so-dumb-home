@@ -5,6 +5,10 @@ import threading
 import time
 
 
+def is_modbus():
+    return False
+
+
 class Driver:
     temperature = 22.5
     setpoint = 24.0

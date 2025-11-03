@@ -22,7 +22,7 @@ def init_log(app_name, path, verbose):
         raise LogPathNotFoundException
 
     global_logger = logging.getLogger()
-    global_logger.setLevel(logging.INFO)
+    global_logger.setLevel(logging.DEBUG)
 
     # add a rotating handler
     file_handler = RotatingFileHandler(path, maxBytes=10 * 1024 * 1024, backupCount=5)
@@ -48,10 +48,15 @@ class ConfigFileNotFoundException(object):
 
 def get_config_file(config_file_param, def_config_paths):
     config_file = config_file_param
+    # If we weren't given an explicit config file, try to find one on the defaults paths
     if not config_file:
         for config_candidate in def_config_paths:
             if os.path.exists(config_candidate):
                 config_file = config_candidate
+    # If we still don't have a config file, die
+    if not config_file:
+        print("Could not find a configuration file")
+        sys.exit(2)
     if not os.path.exists(config_file):
         # Note: Logging has not been initialized at this stage, so just print to screen
         print("Error: Config file not found")
