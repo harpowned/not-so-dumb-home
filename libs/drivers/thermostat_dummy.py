@@ -31,7 +31,7 @@ class Driver:
         self.outTempTimeout = 15  # minutes
         self.outTempTimeSet = datetime.datetime(2000, 1, 1, 0, 0)  # Set a time in the past as initial value
         t = threading.Thread(target=self.out_temp_expiration)
-        t.setDaemon(True)
+        t.daemon=True
         t.start()
 
     def out_temp_expiration(self):

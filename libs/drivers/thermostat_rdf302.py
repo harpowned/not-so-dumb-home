@@ -7,7 +7,7 @@ def is_modbus():
     return True
 
 class Driver:
-    sampling_period = 15
+    sampling_period = 15 ## Send a state message every 15 seconds
     off_temperature = 18
 
     # A note on turning the thermostat on/off:
@@ -55,7 +55,7 @@ class Driver:
         self.outTempTimeout = 15  # minutes
         self.outTempTimeSet = datetime.datetime(2000, 1, 1, 0, 0)  # Set a time in the past as initial value
         t = threading.Thread(target=self.out_temp_expiration)
-        t.setDaemon(True)
+        t.daemon=True
         t.start()
 
     def using_ghost_thermostat(self):
@@ -85,7 +85,7 @@ class Driver:
                     self.outTempTimeSet + datetime.timedelta(minutes=self.outTempTimeout) < datetime.datetime.now()):
                 self.logger.info(
                     "Timeout is expired (set on %s, now is %s)" % (self.outTempTimeSet, datetime.datetime.now()))
-                self.disableSecDisplay()
+                self.disable_sec_display()
             time.sleep(30)
 
     def get_sampling_period(self):
@@ -140,6 +140,9 @@ class Driver:
             is_on = setpoint >= self.off_temperature
             self.logger.info("Is on: %s" % is_on)
             return is_on
+        else:
+            self.logger.error("Requested get_value of unknown key %s", key)
+            return None
 
     def get_settable_vars(self):
         return ["setpoint", "outtemp", "is_on"]
@@ -182,6 +185,8 @@ class Driver:
             else:
                 # self.rdf302_write_int(100, 4)
                 self.set_value("setpoint", self.temp_low)
+        else:
+            self.logger.error("Requested set_value of unknown key %s", key)
 
     def rdf302_read_temp(self, data_address):
         result = round(int(self.modbus_driver.modbus_read_input(self.address, data_address)) / float(50), 2)
