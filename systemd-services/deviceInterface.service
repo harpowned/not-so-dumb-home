@@ -1,0 +1,14 @@
+[Unit]
+Description=Not-so-dumb-home - Device Interface
+
+[Service]
+Type=notify
+WatchdogSec=60
+User=smarthome
+Group=smarthome
+ExecStart=/usr/local/not-so-dumb-home/deviceInterface.py
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

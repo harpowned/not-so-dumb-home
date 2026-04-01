@@ -1,0 +1,12 @@
+[Unit]
+Description=Not-so-dumb-home - Logging Sender
+
+[Service]
+User=smarthome
+Group=smarthome
+ExecStart=/usr/local/not-so-dumb-home/loggingSender.py
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

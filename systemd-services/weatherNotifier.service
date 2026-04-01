@@ -1,0 +1,12 @@
+[Unit]
+Description=Not-so-dumb-home - Weather Notifier
+
+[Service]
+User=smarthome
+Group=smarthome
+ExecStart=/usr/local/not-so-dumb-home/weatherNotifier.py
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

@@ -3,17 +3,21 @@ import struct
 import threading
 import time
 import serial
+from . import systemd_watchdog
 from pymodbus.client.sync import ModbusSerialClient as ModbusClient
 from pymodbus.exceptions import ModbusIOException
 
 
 class ModbusDriver:
-    def __init__(self, modbus_port):
+    def __init__(self, modbus_port, watchdog_enabled=False):
         self.logger = logging.getLogger("not_so_dumb_home.modbusdriver_pymodbus")
         self.serialclient = ModbusClient(method='rtu', port=modbus_port, timeout=0.125, baudrate=9600,
                                          parity=serial.PARITY_EVEN)
         self.serialclient.connect()
         self.mutex = threading.Lock()
+        self.watchdog = False
+        if watchdog_enabled:
+            self.watchdog = systemd_watchdog.Watchdog()
 
     def modbus_read_float(self, device, address):
         self.logger.debug("Acquiring mutex for query to %s" % address)
@@ -26,6 +30,8 @@ class ModbusDriver:
             if type(resp) != ModbusIOException:
                 result = round(struct.unpack('>f', struct.pack('>HH', *resp.registers))[0], 1)
                 self.logger.debug("Modbus call done for query to %s, result is %s" % (address, result))
+                if self.watchdog:
+                    self.watchdog.kick()
             else:
                 self.logger.error("Modbus IO Exception caught")
         except:
@@ -45,6 +51,8 @@ class ModbusDriver:
             response = self.serialclient.read_input_registers(address, 1, unit=device)
             if type(response) != ModbusIOException:
                 result = response.registers[0]
+                if self.watchdog:
+                    self.watchdog.kick()
         except:
             self.logger.error("Exception caught")
         finally:

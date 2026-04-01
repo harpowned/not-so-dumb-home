@@ -64,8 +64,9 @@ def main(args):
 
     modbus_port = config["modbus"]["port"]
     modbus_driver = None
+    systemd_watchdog_enabled = config["modbus"]["systemd-watchdog-enabled"]
     if modbus_port != "disabled":
-        modbus_driver = modbus_driver_lib.ModbusDriver(modbus_port)
+        modbus_driver = modbus_driver_lib.ModbusDriver(modbus_port,watchdog_enabled=systemd_watchdog_enabled)
 
     enabled_devices = config["deviceInterface"]["enabled_devices"].replace(" ", "").split(',')
     device_drivers = dict()
